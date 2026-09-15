@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Cahier</title>
+<link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+<div id="app">
+  <div class="titlebar">
+    <div class="traffic-lights">
+      <button id="tl-close" class="traffic-light close" aria-label="Fermer"></button>
+      <button id="tl-minimize" class="traffic-light minimize" aria-label="Réduire"></button>
+      <button id="tl-zoom" class="traffic-light zoom" aria-label="Plein écran"></button>
+    </div>
+    <div id="titlebar-text" class="titlebar-text">Cahier</div>
+  </div>
+
+  <!-- LIBRARY -->
+  <section id="view-library" class="view">
+    <div class="view-scroll">
+      <div class="library-inner">
+        <div class="library-header">
+          <div>
+            <p class="library-eyebrow">Cahier</p>
+            <h1 class="library-title">Bibliothèque</h1>
+          </div>
+          <button id="new-course-btn" class="btn btn-primary">+ Nouveau cours</button>
+        </div>
+
+        <input id="search" class="search" type="text" placeholder="Rechercher un module ou un cours…" />
+
+        <div id="subject-groups"></div>
+
+        <div id="empty-library" class="empty-library" hidden></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- RECORDING -->
+  <section id="view-recording" class="view" hidden>
+    <div class="recording-topbar">
+      <button id="back-to-library-from-recording" class="btn-ghost">← Bibliothèque</button>
+    </div>
+    <div class="recording-center">
+      <div class="field-group">
+        <label for="subject-select">Module</label>
+        <select id="subject-select" class="subject-select"></select>
+      </div>
+      <button id="record-btn" class="record-btn" aria-label="Démarrer l'enregistrement">
+        <span id="record-icon" class="record-icon"></span>
+      </button>
+      <div id="record-timer" class="record-timer">00:00</div>
+      <div id="record-status" class="record-status">Prêt</div>
+    </div>
+  </section>
+
+  <!-- DETAIL -->
+  <section id="view-detail" class="view" hidden>
+    <div class="detail-top">
+      <button id="back-to-library-from-detail" class="btn-ghost">← Bibliothèque</button>
+      <div class="detail-heading">
+        <h1 id="detail-subject-title"></h1>
+        <span id="detail-meta" class="meta"></span>
+        <span class="detail-actions">
+          <button id="delete-course-btn" class="btn-ghost-muted">Supprimer</button>
+        </span>
+      </div>
+      <nav class="tabs">
+        <button class="tab active" data-tab="transcription">Transcription</button>
+        <button class="tab" data-tab="slides">Slides</button>
+        <button class="tab" data-tab="fiche">Fiche</button>
+        <button class="tab" data-tab="exercices">Exercices</button>
+      </nav>
+    </div>
+
+    <div class="detail-content">
+      <div id="tab-transcription" class="tab-panel active">
+        <div id="transcription-text" class="transcription-text"></div>
+      </div>
+
+      <div id="tab-slides" class="tab-panel">
+        <div id="slides-dropzone" class="dropzone">
+          <p>Glisser un PDF de slides ici</p>
+          <label class="btn btn-secondary">
+            Choisir un fichier
+            <input id="slides-input" type="file" accept="application/pdf" hidden />
+          </label>
+        </div>
+        <div id="slides-grid" class="slides-grid"></div>
+      </div>
+
+      <div id="tab-fiche" class="tab-panel">
+        <div id="fiche-paper" class="paper" hidden>
+          <embed id="fiche-embed" type="application/pdf" />
+        </div>
+        <div id="fiche-empty" class="paper-empty">
+          <p>Aucune fiche générée pour ce cours.</p>
+          <button class="btn btn-secondary copy-prompt-btn" data-target="fiche">Copier la demande pour Claude Code</button>
+          <div class="copied-hint" data-hint="fiche" hidden>Copié !</div>
+        </div>
+      </div>
+
+      <div id="tab-exercices" class="tab-panel">
+        <div id="exercices-paper" class="paper" hidden>
+          <embed id="exercices-embed" type="application/pdf" />
+        </div>
+        <div id="exercices-empty" class="paper-empty">
+          <p>Aucun exercice généré pour ce cours.</p>
+          <button class="btn btn-secondary copy-prompt-btn" data-target="exercices">Copier la demande pour Claude Code</button>
+          <div class="copied-hint" data-hint="exercices" hidden>Copié !</div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

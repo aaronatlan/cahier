@@ -1,0 +1,9 @@
+faster-whisper
+sounddevice
+soundfile
+numpy
+fastapi
+uvicorn[standard]
+pywebview
+pymupdf
+python-multipart
