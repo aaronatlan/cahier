@@ -69,6 +69,7 @@
       </div>
       <nav class="tabs">
         <button class="tab active" data-tab="transcription">Transcription</button>
+        <button class="tab" data-tab="resume">Résumé</button>
         <button class="tab" data-tab="slides">Slides</button>
         <button class="tab" data-tab="fiche">Fiche</button>
         <button class="tab" data-tab="exercices">Exercices</button>
@@ -78,6 +79,15 @@
     <div class="detail-content">
       <div id="tab-transcription" class="tab-panel active">
         <div id="transcription-text" class="transcription-text"></div>
+      </div>
+
+      <div id="tab-resume" class="tab-panel">
+        <div id="resume-text" class="markdown-view"></div>
+        <div id="resume-empty" class="paper-empty" hidden>
+          <p>Pas encore de résumé pour ce cours.</p>
+          <button class="btn btn-secondary copy-prompt-btn" data-target="resume">Copier la demande pour Claude Code</button>
+          <div class="copied-hint" data-hint="resume" hidden>Copié !</div>
+        </div>
       </div>
 
       <div id="tab-slides" class="tab-panel">

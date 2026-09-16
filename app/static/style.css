@@ -406,6 +406,31 @@ button, input, select {
   white-space: pre-wrap;
 }
 
+.markdown-view {
+  max-width: 700px;
+  font-size: 14.5px;
+  line-height: 1.6;
+}
+.markdown-view h2 {
+  font-size: 17px;
+  font-weight: 640;
+  margin: 28px 0 10px;
+}
+.markdown-view h2:first-child { margin-top: 0; }
+.markdown-view h3 {
+  font-size: 15px;
+  font-weight: 590;
+  color: var(--c-muted);
+  margin: 18px 0 6px;
+}
+.markdown-view ul {
+  margin: 0 0 14px;
+  padding-left: 20px;
+}
+.markdown-view li { margin-bottom: 5px; }
+.markdown-view p { margin: 0 0 12px; }
+.markdown-view strong { font-weight: 640; }
+
 .dropzone {
   border: 1.5px dashed var(--c-border);
   border-radius: var(--r-card);

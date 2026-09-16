@@ -119,6 +119,9 @@ def get_course(course_id: str) -> dict:
         transcript_path.read_text(encoding="utf-8") if transcript_path.exists() else ""
     )
 
+    resume_path = course_dir / "resume.md"
+    meta["resume"] = resume_path.read_text(encoding="utf-8") if resume_path.exists() else ""
+
     slides_dir = course_dir / "slides"
     pages = sorted(slides_dir.glob("page-*.png")) if slides_dir.exists() else []
     meta["slides_pages"] = [p.name for p in pages]

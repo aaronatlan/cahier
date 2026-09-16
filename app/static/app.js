@@ -227,6 +227,52 @@
     return div.innerHTML;
   }
 
+  // Mini-rendu markdown pour resume.md : volontairement minimal (##, listes à puces
+  // avec sous-puces indentées, **gras**) puisque c'est nous qui contrôlons ce que
+  // Claude Code écrit dans ce fichier (voir CLAUDE.md > Résumé).
+  function renderMarkdown(md) {
+    const inline = (text) =>
+      escapeHtml(text).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+
+    const lines = md.replace(/\r\n/g, "\n").split("\n");
+    let html = "";
+    let listDepth = 0;
+
+    const closeLists = (toDepth) => {
+      while (listDepth > toDepth) {
+        html += "</ul>";
+        listDepth--;
+      }
+    };
+
+    for (const rawLine of lines) {
+      const line = rawLine.trimEnd();
+      const heading = /^(#{2,3})\s+(.*)$/.exec(line);
+      const bullet = /^(\s*)[-*]\s+(.*)$/.exec(line);
+
+      if (heading) {
+        closeLists(0);
+        const tag = heading[1].length === 2 ? "h2" : "h3";
+        html += `<${tag}>${inline(heading[2])}</${tag}>`;
+      } else if (bullet) {
+        const depth = Math.floor(bullet[1].length / 2) + 1;
+        if (listDepth > depth) closeLists(depth);
+        while (listDepth < depth) {
+          html += "<ul>";
+          listDepth++;
+        }
+        html += `<li>${inline(bullet[2])}</li>`;
+      } else if (line.trim() === "") {
+        closeLists(0);
+      } else {
+        closeLists(0);
+        html += `<p>${inline(line.trim())}</p>`;
+      }
+    }
+    closeLists(0);
+    return html;
+  }
+
   // --- Enregistrement ---------------------------------------------------
 
   function resetRecordUI() {
@@ -320,9 +366,23 @@
       (course.statut === "transcribing" ? "Transcription en cours…" : "(vide)");
 
     switchTab("transcription");
+    renderResume(course);
     renderSlides(course);
     renderPaper("fiche", course.fiche_pdf, id);
     renderPaper("exercices", course.exercices_pdf, id);
+  }
+
+  function renderResume(course) {
+    const text = $("#resume-text");
+    const empty = $("#resume-empty");
+    if (course.resume) {
+      text.hidden = false;
+      empty.hidden = true;
+      text.innerHTML = renderMarkdown(course.resume);
+    } else {
+      text.hidden = true;
+      empty.hidden = false;
+    }
   }
 
   function renderSlides(course) {
