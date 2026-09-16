@@ -3,6 +3,10 @@ venv/
 __pycache__/
 *.pyc
 
+# --- py2app build artifacts ---
+build/
+dist/
+
 # --- OS ---
 .DS_Store
 

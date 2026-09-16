@@ -7,3 +7,6 @@ uvicorn[standard]
 pywebview
 pymupdf
 python-multipart
+
+# empaquetage de l'app en .app (voir README > Reconstruire l'app)
+py2app

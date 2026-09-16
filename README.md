@@ -39,6 +39,35 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
+## Reconstruire l'app après un changement de code
+
+`Cahier.app` est empaqueté avec `py2app` en **mode alias** (`-A`) : le bundle
+contient un vrai exécutable compilé (nécessaire pour que macOS l'identifie
+correctement et propose l'autorisation micro — voir plus bas), mais son code
+Python reste un lien symbolique vers ce dossier. Donc la plupart des
+changements (Python, JS, CSS) sont pris en compte au prochain lancement,
+**sans rebuild**. Un rebuild n'est nécessaire que si tu changes `setup.py`,
+l'icône, ou l'`Info.plist` :
+
+```bash
+source venv/bin/activate
+python3 setup.py py2app -A
+rm -rf ~/Applications/Cahier.app
+cp -R dist/Cahier.app ~/Applications/Cahier.app
+codesign --force --deep --sign - ~/Applications/Cahier.app
+```
+
+### Pourquoi py2app (et pas un simple script shell)
+
+La première version de l'app était un bundle fait main dont l'exécutable
+était juste un script shell lançant `python3` (le vrai binaire de
+`Python.framework`). macOS attribue les autorisations TCC (micro, dossiers
+protégés) au binaire qui fait réellement l'appel système, pas au bundle qui
+l'a lancé — donc le script shell n'obtenait jamais la popup d'autorisation
+micro (silence total en enregistrement, sans erreur). `py2app` produit un
+vrai binaire compilé comme exécutable principal, que macOS peut identifier
+et signer (`com.aaronatlan.cahier`), ce qui résout le problème.
+
 ## Réglages utiles
 
 - `app/transcriber.py` : `MODEL_SIZE` (`"medium"` par défaut) et `LANGUAGE`
@@ -47,8 +76,6 @@ pip install -r requirements.txt
   bibliothèque.
 - `.claude/commands/fiche.md` : la commande `/fiche <id>` qui génère la fiche
   et les exercices. Voir `CLAUDE.md` pour les conventions LaTeX.
-- Si ce dossier est un jour déplacé à nouveau, penser à mettre à jour
-  `PROJECT_DIR` dans `~/Applications/Cahier.app/Contents/MacOS/launch`.
 
 ## Ancien script (`cours.py`)
 
