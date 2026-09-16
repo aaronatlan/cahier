@@ -6,9 +6,11 @@ cours passés groupée par matière MIT. Les fiches de révision et exercices en
 LaTeX sont générés à la demande par Claude Code (pas de clé API embarquée
 dans l'app).
 
-Le code vit ici, dans `~/cours-transcription` (volontairement hors de
-`~/Desktop` — voir `livrables/applications/cahier/README.md` dans
-jarvis-starter-kit pour pourquoi). L'app installée tourne depuis
+Ce dossier est son propre repo git (poussé sur
+[github.com/aaronatlan/cahier](https://github.com/aaronatlan/cahier), public),
+imbriqué dans `jarvis-starter-kit` (privé) mais ignoré par son `.gitignore` —
+donc un seul `git push` d'ici suffit, jamais besoin de toucher au repo jarvis
+pour un changement sur Cahier. L'app installée tourne depuis
 `~/Applications/Cahier.app` et les données des cours dans `~/Cours/`.
 
 ## Utilisation au quotidien
@@ -21,8 +23,8 @@ Ouvre **Cahier** depuis le Dock ou Spotlight. Aucun terminal à ouvrir.
 3. Ajoute les slides du cours (PDF) dans l'onglet **Slides** si tu en as.
 4. Onglets **Fiche** / **Exercices** : bouton "Copier la demande pour Claude
    Code" → colle-la dans une session Claude Code ouverte dans ce dossier
-   (`~/cours-transcription`) → la fiche et les exercices sont générés en
-   LaTeX et compilés en PDF, consultables directement dans l'app.
+   (`livrables/applications/cahier`) → la fiche et les exercices sont générés
+   en LaTeX et compilés en PDF, consultables directement dans l'app.
 
 Tous les cours sont stockés dans `~/Cours/<id>/` (audio, transcription,
 slides, fiche/exercices).
@@ -31,7 +33,7 @@ slides, fiche/exercices).
 
 ```bash
 brew install portaudio
-cd cours-transcription
+cd livrables/applications/cahier
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
