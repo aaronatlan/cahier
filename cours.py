@@ -9,23 +9,19 @@ Utilisation :
     - Appuyer sur Entrée pour démarrer l'enregistrement
     - Appuyer sur Entrée une seconde fois pour arrêter
     - La transcription se lance automatiquement et un fichier .txt est créé
+
+Délègue à app/recorder.py et app/transcriber.py (la même logique que l'app
+graphique Cahier) pour ne jamais diverger de son comportement.
 """
 
 import datetime
 import sys
 from pathlib import Path
 
-import numpy as np
-import sounddevice as sd
-import soundfile as sf
+from app.recorder import recorder
+from app.transcriber import transcribe
 
-# --- Configuration -----------------------------------------------------
-
-SAMPLE_RATE = 16000          # fréquence attendue par Whisper
-CHANNELS = 1
 OUTPUT_DIR = Path.home() / "Cours" / "enregistrements"
-MODEL_SIZE = "medium"        # "tiny", "base", "small", "medium", "large-v3"
-LANGUAGE = None              # None = détection automatique, pas de traduction forcée
 
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -33,63 +29,34 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 # --- Enregistrement ------------------------------------------------------
 
 def record_audio(output_path: Path) -> None:
-    frames = []
-
-    def callback(indata, frame_count, time_info, status):
-        if status:
-            print(status, file=sys.stderr)
-        frames.append(indata.copy())
-
     print("Appuie sur Entrée pour démarrer l'enregistrement...")
     input()
     print("Enregistrement en cours... Appuie sur Entrée pour arrêter.")
 
     try:
-        with sd.InputStream(
-            samplerate=SAMPLE_RATE, channels=CHANNELS, callback=callback
-        ):
-            input()
-    except sd.PortAudioError as exc:
+        recorder.start()
+    except Exception as exc:  # noqa: BLE001
         print(f"Impossible d'accéder au micro : {exc}", file=sys.stderr)
         sys.exit(1)
 
-    if not frames:
-        print("Aucun audio capturé, abandon.")
+    input()
+
+    try:
+        recorder.stop(output_path)
+    except RuntimeError as exc:
+        print(str(exc), file=sys.stderr)
         sys.exit(1)
 
-    audio_data = np.concatenate(frames, axis=0)
-    sf.write(str(output_path), audio_data, SAMPLE_RATE)
     print(f"Enregistrement sauvegardé : {output_path}")
 
 
 # --- Transcription ---------------------------------------------------------
 
 def transcribe_audio(audio_path: Path, transcript_path: Path) -> None:
-    from faster_whisper import WhisperModel
-
-    print(f"Chargement du modèle Whisper ({MODEL_SIZE})...")
-    model = WhisperModel(MODEL_SIZE, device="cpu", compute_type="int8")
-
     print("Transcription en cours (ça peut prendre quelques minutes)...")
-    segments, info = model.transcribe(str(audio_path), language=LANGUAGE)
-    print(f"Langue détectée : {info.language} (confiance {info.language_probability:.0%})")
-
-    lines = []
-    for segment in segments:
-        start = format_timestamp(segment.start)
-        lines.append(f"[{start}] {segment.text.strip()}")
-        print(f"[{start}] {segment.text.strip()}")
-
-    transcript_path.write_text("\n".join(lines), encoding="utf-8")
+    text = transcribe(audio_path, transcript_path)
+    print(text)
     print(f"\nTranscription sauvegardée : {transcript_path}")
-
-
-def format_timestamp(seconds: float) -> str:
-    minutes, sec = divmod(int(seconds), 60)
-    hours, minutes = divmod(minutes, 60)
-    if hours:
-        return f"{hours:02d}:{minutes:02d}:{sec:02d}"
-    return f"{minutes:02d}:{sec:02d}"
 
 
 # --- Main ------------------------------------------------------------------

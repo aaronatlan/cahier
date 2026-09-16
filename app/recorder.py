@@ -48,13 +48,21 @@ class Recorder:
             if self._stream is None:
                 raise RuntimeError("Aucun enregistrement en cours.")
             stream = self._stream
+
+        # stream.stop() bloque jusqu'à ce qu'aucun callback ne puisse plus se
+        # déclencher ; appelé hors du verrou pour ne pas bloquer un callback en
+        # cours qui attendrait ce même verrou (deadlock). Une fois stop() revenu,
+        # self._frames peut être vidé sans risque qu'un callback tardif y écrive
+        # encore et perde silencieusement la fin de l'enregistrement.
+        stream.stop()
+
+        with self._lock:
             frames = self._frames
             started_at = self._started_at
             self._stream = None
             self._frames = []
             self._started_at = None
 
-        stream.stop()
         stream.close()
 
         duration = time.monotonic() - started_at if started_at else 0.0

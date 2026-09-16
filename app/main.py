@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import socket
+import sys
 import threading
 import time
 from pathlib import Path
@@ -25,14 +26,17 @@ def _brand_dock_icon() -> None:
     try:
         from AppKit import NSApplication, NSImage
         from Foundation import NSProcessInfo
+    except ImportError:
+        return  # pas macOS, ou PyObjC indisponible : pas bloquant
 
+    try:
         NSProcessInfo.processInfo().setProcessName_(APP_NAME)
         if ICON_PATH.exists():
             icon = NSImage.alloc().initByReferencingFile_(str(ICON_PATH))
             if icon is not None:
                 NSApplication.sharedApplication().setApplicationIconImage_(icon)
-    except Exception:
-        pass  # pas macOS, ou PyObjC indisponible : pas bloquant
+    except Exception as exc:  # noqa: BLE001
+        print(f"_brand_dock_icon: échec non bloquant : {exc!r}", file=sys.stderr)
 
 
 def _run_server() -> None:
@@ -57,10 +61,17 @@ def _on_main_thread(func) -> None:
     principal via PyObjCTools.AppHelper avant d'agir sur la fenêtre."""
     try:
         from PyObjCTools import AppHelper
-
-        AppHelper.callAfter(func)
-    except Exception:
+    except ImportError:
         func()  # pas macOS / PyObjC indisponible : on tente en direct
+        return
+
+    try:
+        AppHelper.callAfter(func)
+    except Exception as exc:  # noqa: BLE001
+        # Ne pas appeler func() directement ici : ce serait reproduire le bug
+        # (appel AppKit hors thread principal = no-op silencieux) que ce
+        # wrapper existe justement pour éviter.
+        print(f"_on_main_thread: callAfter a échoué : {exc!r}", file=sys.stderr)
 
 
 class WindowAPI:
@@ -103,11 +114,14 @@ def _disable_window_restoration() -> None:
     de titre custom inertes)."""
     try:
         from AppKit import NSApplication
+    except ImportError:
+        return
 
+    try:
         for win in NSApplication.sharedApplication().windows():
             win.setRestorable_(False)
-    except Exception:
-        pass
+    except Exception as exc:  # noqa: BLE001
+        print(f"_disable_window_restoration: échec non bloquant : {exc!r}", file=sys.stderr)
 
 
 def main() -> None:

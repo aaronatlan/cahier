@@ -169,7 +169,10 @@ def prompt_fiche(course_id: str) -> dict:
 
 @app.get("/api/courses/{course_id}/file/{file_path:path}")
 def get_course_file(course_id: str, file_path: str) -> FileResponse:
-    course_dir = storage.get_course_dir(course_id).resolve()
+    try:
+        course_dir = storage.get_course_dir(course_id).resolve()
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Cours introuvable.")
     target = (course_dir / file_path).resolve()
     if target != course_dir and course_dir not in target.parents:
         raise HTTPException(status_code=403, detail="Interdit.")

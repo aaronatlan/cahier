@@ -275,8 +275,8 @@
     try {
       result = await api("/api/record/stop", { method: "POST" });
     } catch (err) {
-      $("#record-status").textContent = err.message;
       resetRecordUI();
+      $("#record-status").textContent = err.message;
       return;
     }
     pollUntilDone(result.id);

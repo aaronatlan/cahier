@@ -18,7 +18,10 @@ BASE_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def _course_dir(course_id: str) -> Path:
-    return BASE_DIR / course_id
+    course_dir = (BASE_DIR / course_id).resolve()
+    if course_dir.parent != BASE_DIR.resolve():
+        raise ValueError(f"course_id invalide : {course_id!r}")
+    return course_dir
 
 
 def _meta_path(course_dir: Path) -> Path:
@@ -30,9 +33,15 @@ def new_course_id() -> str:
 
 
 def create_course(matiere: str = "") -> tuple[str, Path]:
-    course_id = new_course_id()
+    base_id = new_course_id()
+    course_id = base_id
     course_dir = _course_dir(course_id)
-    course_dir.mkdir(parents=True, exist_ok=False)
+    n = 1
+    while course_dir.exists():
+        n += 1
+        course_id = f"{base_id}-{n}"
+        course_dir = _course_dir(course_id)
+    course_dir.mkdir(parents=True)
     meta = {
         "id": course_id,
         "titre": "Nouveau cours",
@@ -74,7 +83,10 @@ def _enrich(meta: dict, course_dir: Path) -> dict:
 
 
 def get_course(course_id: str) -> Optional[dict]:
-    course_dir = _course_dir(course_id)
+    try:
+        course_dir = _course_dir(course_id)
+    except ValueError:
+        return None
     meta = load_meta(course_dir)
     if meta is None:
         return None
@@ -86,7 +98,10 @@ def get_course_dir(course_id: str) -> Path:
 
 
 def update_course(course_id: str, **fields) -> Optional[dict]:
-    course_dir = _course_dir(course_id)
+    try:
+        course_dir = _course_dir(course_id)
+    except ValueError:
+        return None
     meta = load_meta(course_dir)
     if meta is None:
         return None
@@ -96,7 +111,10 @@ def update_course(course_id: str, **fields) -> Optional[dict]:
 
 
 def delete_course(course_id: str) -> bool:
-    course_dir = _course_dir(course_id)
+    try:
+        course_dir = _course_dir(course_id)
+    except ValueError:
+        return False
     if not course_dir.exists():
         return False
     shutil.rmtree(course_dir)
