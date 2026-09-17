@@ -200,7 +200,9 @@
           ));
         }
         if (session.a_des_slides) badges.appendChild(makeBadge("Slides", false));
-        if (session.statut_fiche === "genere") badges.appendChild(makeBadge("Fiche prête", true));
+        if (session.resume_ok) badges.appendChild(makeBadge("Résumé", true));
+        if (session.fiche_pdf) badges.appendChild(makeBadge("Fiche", true));
+        if (session.exercices_pdf) badges.appendChild(makeBadge("Exercices", true));
 
         row.appendChild(info);
         row.appendChild(badges);
