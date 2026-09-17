@@ -31,3 +31,25 @@ def process_pdf(pdf_bytes: bytes, slides_dir: Path) -> int:
         return len(doc)
     finally:
         doc.close()
+
+
+def delete_page(slides_dir: Path, page_number: int) -> int:
+    """Retire une page (numérotation 1-based) du jeu de slides et retraite le
+    reste (source.pdf, page-XX.png, texte.txt) pour que tout reste cohérent
+    et correctement renuméroté. Retourne le nombre de pages restantes."""
+    import pymupdf
+
+    doc = pymupdf.open(str(slides_dir / "source.pdf"))
+    try:
+        if not (1 <= page_number <= len(doc)):
+            raise ValueError(f"Page {page_number} invalide (le jeu en a {len(doc)}).")
+        doc.delete_page(page_number - 1)
+        remaining = len(doc)
+        pdf_bytes = doc.tobytes() if remaining else None
+    finally:
+        doc.close()
+
+    if not remaining:
+        shutil.rmtree(slides_dir)
+        return 0
+    return process_pdf(pdf_bytes, slides_dir)

@@ -360,7 +360,8 @@
     showScreen("detail");
 
     $("#detail-subject-title").textContent = course.matiere_titre;
-    $("#detail-meta").textContent = `${course.titre} · ${formatDate(course.date)}`;
+    renderDetailTitre(course.titre);
+    $("#detail-date").textContent = formatDate(course.date);
     $("#transcription-text").textContent = course.transcription ||
       (course.statut === "transcribing" ? "Transcription en cours…" : "(vide)");
 
@@ -377,18 +378,160 @@
     if (ready) $("#resume-text").innerHTML = renderMarkdown(course.resume);
   }
 
+  // --- Titre du cours (édition inline) -----------------------------------
+
+  function renderDetailTitre(titre) {
+    const span = document.createElement("span");
+    span.id = "detail-titre";
+    span.className = "detail-titre-editable";
+    span.title = "Cliquer pour renommer";
+    span.textContent = titre;
+    span.addEventListener("click", () => editDetailTitre(titre));
+    $("#detail-titre").replaceWith(span);
+  }
+
+  function editDetailTitre(current) {
+    const input = document.createElement("input");
+    input.id = "detail-titre";
+    input.type = "text";
+    input.className = "detail-titre-input";
+    input.value = current;
+    $("#detail-titre").replaceWith(input);
+    input.focus();
+    input.select();
+
+    let settled = false;
+    const commit = async () => {
+      if (settled) return;
+      settled = true;
+      const newTitre = input.value.trim() || current;
+      if (newTitre === current) {
+        renderDetailTitre(current);
+        return;
+      }
+      try {
+        await api(`/api/courses/${state.currentId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ titre: newTitre }),
+        });
+        const course = state.courses.find((c) => c.id === state.currentId);
+        if (course) course.titre = newTitre;
+        renderDetailTitre(newTitre);
+      } catch (err) {
+        alert(err.message);
+        renderDetailTitre(current);
+      }
+    };
+    input.addEventListener("blur", commit);
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") input.blur();
+      if (e.key === "Escape") {
+        settled = true;
+        renderDetailTitre(current);
+      }
+    });
+  }
+
+  // --- Slides --------------------------------------------------------
+
   function renderSlides(course) {
     const grid = $("#slides-grid");
     grid.innerHTML = "";
-    for (const page of course.slides_pages) {
+    course.slides_pages.forEach((page, index) => {
       const thumb = document.createElement("div");
       thumb.className = "slide-thumb";
+      thumb.addEventListener("click", () => openSlideViewer(course.id, course.slides_pages, index));
+
       const img = document.createElement("img");
       img.src = `/api/courses/${course.id}/file/slides/${page}`;
       img.loading = "lazy";
       thumb.appendChild(img);
+
+      const delBtn = document.createElement("button");
+      delBtn.className = "slide-delete-btn";
+      delBtn.textContent = "✕";
+      delBtn.title = "Supprimer cette page";
+      delBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        deleteSlidePage(course.id, page);
+      });
+      thumb.appendChild(delBtn);
+
       grid.appendChild(thumb);
+    });
+    $("#slides-toolbar").hidden = course.slides_pages.length === 0;
+  }
+
+  async function refreshCourse(id) {
+    const course = await api(`/api/courses/${id}`).catch((err) => {
+      alert(err.message);
+      return null;
+    });
+    if (!course) return null;
+    const idx = state.courses.findIndex((c) => c.id === id);
+    if (idx !== -1) state.courses[idx] = course;
+    return course;
+  }
+
+  async function deleteAllSlides(courseId) {
+    if (!confirm("Supprimer toutes les slides de ce cours ?")) return;
+    try {
+      await api(`/api/courses/${courseId}/slides`, { method: "DELETE" });
+    } catch (err) {
+      alert(err.message);
+      return;
     }
+    const course = await refreshCourse(courseId);
+    if (course) renderSlides(course);
+  }
+
+  async function deleteSlidePage(courseId, pageFilename) {
+    const match = /page-(\d+)\.png$/.exec(pageFilename);
+    if (!match) return;
+    const pageNumber = parseInt(match[1], 10);
+    try {
+      await api(`/api/courses/${courseId}/slides/${pageNumber}`, { method: "DELETE" });
+    } catch (err) {
+      alert(err.message);
+      return;
+    }
+    const course = await refreshCourse(courseId);
+    if (course) renderSlides(course);
+  }
+
+  // --- Visionneuse de slides -------------------------------------------
+
+  let viewerCourseId = null;
+  let viewerPages = [];
+  let viewerIndex = 0;
+
+  function openSlideViewer(courseId, pages, index) {
+    viewerCourseId = courseId;
+    viewerPages = pages;
+    viewerIndex = index;
+    renderSlideViewer();
+    $("#slide-viewer").hidden = false;
+  }
+
+  function closeSlideViewer() {
+    $("#slide-viewer").hidden = true;
+    $("#slide-viewer-img").src = "";
+  }
+
+  function stepSlideViewer(delta) {
+    const next = viewerIndex + delta;
+    if (next < 0 || next >= viewerPages.length) return;
+    viewerIndex = next;
+    renderSlideViewer();
+  }
+
+  function renderSlideViewer() {
+    const page = viewerPages[viewerIndex];
+    $("#slide-viewer-img").src = `/api/courses/${viewerCourseId}/file/slides/${page}`;
+    $("#slide-viewer-counter").textContent = `${viewerIndex + 1} / ${viewerPages.length}`;
+    $("#slide-viewer-prev").disabled = viewerIndex === 0;
+    $("#slide-viewer-next").disabled = viewerIndex === viewerPages.length - 1;
   }
 
   function renderPaper(kind, ready, courseId) {
@@ -517,6 +660,21 @@
       e.preventDefault();
       dropzone.classList.remove("dragover");
       uploadSlides(e.dataTransfer.files[0]);
+    });
+
+    $("#delete-slides-btn").addEventListener("click", () => deleteAllSlides(state.currentId));
+
+    $("#slide-viewer-close").addEventListener("click", closeSlideViewer);
+    $("#slide-viewer-prev").addEventListener("click", () => stepSlideViewer(-1));
+    $("#slide-viewer-next").addEventListener("click", () => stepSlideViewer(1));
+    $("#slide-viewer").addEventListener("click", (e) => {
+      if (e.target.id === "slide-viewer") closeSlideViewer();
+    });
+    document.addEventListener("keydown", (e) => {
+      if ($("#slide-viewer").hidden) return;
+      if (e.key === "Escape") closeSlideViewer();
+      else if (e.key === "ArrowLeft") stepSlideViewer(-1);
+      else if (e.key === "ArrowRight") stepSlideViewer(1);
     });
 
     loadSubjects().then(loadCourses);

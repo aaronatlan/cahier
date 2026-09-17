@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 from typing import Optional
 
@@ -18,8 +19,19 @@ from .recorder import recorder
 
 STATIC_DIR = Path(__file__).parent / "static"
 
+class NoCacheStaticFiles(StaticFiles):
+    """Empêche la mise en cache agressive des fichiers statiques par la webview :
+    sans ça, un changement d'app.js/style.css peut rester invisible après un
+    simple relancement de l'app tant que le cache HTTP local n'a pas expiré."""
+
+    def file_response(self, *args, **kwargs):
+        response = super().file_response(*args, **kwargs)
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
+
 app = FastAPI(title="Cahier")
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+app.mount("/static", NoCacheStaticFiles(directory=STATIC_DIR), name="static")
 
 _current_course_id: Optional[str] = None
 
@@ -31,7 +43,7 @@ def _on_startup() -> None:
 
 @app.get("/")
 def index() -> FileResponse:
-    return FileResponse(STATIC_DIR / "index.html")
+    return FileResponse(STATIC_DIR / "index.html", headers={"Cache-Control": "no-store"})
 
 
 # --- Enregistrement --------------------------------------------------------
@@ -167,6 +179,32 @@ async def upload_slides(course_id: str, file: UploadFile) -> dict:
     pdf_bytes = await file.read()
     page_count = slides_module.process_pdf(pdf_bytes, course_dir / "slides")
     return {"pages": page_count}
+
+
+@app.delete("/api/courses/{course_id}/slides")
+def delete_slides(course_id: str) -> dict:
+    meta = storage.get_course(course_id)
+    if meta is None:
+        raise HTTPException(status_code=404, detail="Cours introuvable.")
+    slides_dir = storage.get_course_dir(course_id) / "slides"
+    if slides_dir.exists():
+        shutil.rmtree(slides_dir)
+    return {"ok": True}
+
+
+@app.delete("/api/courses/{course_id}/slides/{page_number}")
+def delete_slide_page(course_id: str, page_number: int) -> dict:
+    meta = storage.get_course(course_id)
+    if meta is None:
+        raise HTTPException(status_code=404, detail="Cours introuvable.")
+    slides_dir = storage.get_course_dir(course_id) / "slides"
+    if not (slides_dir / "source.pdf").exists():
+        raise HTTPException(status_code=404, detail="Pas de slides pour ce cours.")
+    try:
+        remaining = slides_module.delete_page(slides_dir, page_number)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"pages": remaining}
 
 
 @app.get("/api/courses/{course_id}/prompt-fiche")

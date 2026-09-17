@@ -62,7 +62,10 @@
       <button id="back-to-library-from-detail" class="btn-ghost">← Bibliothèque</button>
       <div class="detail-heading">
         <h1 id="detail-subject-title"></h1>
-        <span id="detail-meta" class="meta"></span>
+        <span class="meta">
+          <span id="detail-titre" class="detail-titre-editable" title="Cliquer pour renommer"></span>
+          · <span id="detail-date"></span>
+        </span>
         <span class="detail-actions">
           <button id="delete-course-btn" class="btn-ghost-muted">Supprimer</button>
         </span>
@@ -98,6 +101,9 @@
             <input id="slides-input" type="file" accept="application/pdf" hidden />
           </label>
         </div>
+        <div id="slides-toolbar" class="slides-toolbar" hidden>
+          <button id="delete-slides-btn" class="btn-ghost-muted">Supprimer les slides</button>
+        </div>
         <div id="slides-grid" class="slides-grid"></div>
       </div>
 
@@ -124,6 +130,15 @@
       </div>
     </div>
   </section>
+
+  <!-- VISIONNEUSE DE SLIDES -->
+  <div id="slide-viewer" class="slide-viewer" hidden>
+    <button id="slide-viewer-close" class="slide-viewer-close" aria-label="Fermer">✕</button>
+    <button id="slide-viewer-prev" class="slide-viewer-nav slide-viewer-prev" aria-label="Page précédente">‹</button>
+    <img id="slide-viewer-img" class="slide-viewer-img" alt="" />
+    <button id="slide-viewer-next" class="slide-viewer-nav slide-viewer-next" aria-label="Page suivante">›</button>
+    <div id="slide-viewer-counter" class="slide-viewer-counter"></div>
+  </div>
 </div>
 
 <script src="/static/app.js"></script>
