@@ -119,6 +119,10 @@ def delete_course(course_id: str) -> bool:
     if not course_dir.exists():
         return False
     shutil.rmtree(course_dir)
+    if course_id.startswith("legacy_"):
+        timestamp = course_id.removeprefix("legacy_")
+        (LEGACY_DIR / f"cours_{timestamp}.txt").unlink(missing_ok=True)
+        (LEGACY_DIR / f"cours_{timestamp}.wav").unlink(missing_ok=True)
     return True
 
 
