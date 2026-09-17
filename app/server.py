@@ -13,7 +13,7 @@ from pydantic import BaseModel
 from . import slides as slides_module
 from . import storage
 from . import subjects as subjects_module
-from . import transcriber
+from .live_transcription import live_transcriber
 from .recorder import recorder
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -60,8 +60,9 @@ def start_recording(body: StartRecordingBody = StartRecordingBody()) -> dict:
         recorder.start()
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=str(exc)) from exc
-    course_id, _course_dir = storage.create_course(matiere=body.matiere)
+    course_id, course_dir = storage.create_course(matiere=body.matiere)
     _current_course_id = course_id
+    live_transcriber.start(course_dir / "transcription.txt")
     return {"id": course_id}
 
 
@@ -76,6 +77,11 @@ def stop_recording(background_tasks: BackgroundTasks) -> dict:
     course_dir = storage.get_course_dir(course_id)
     audio_path = course_dir / "audio.wav"
 
+    # pause() capture ce qui n'a pas encore été transcrit AVANT recorder.stop(),
+    # qui vide le buffer du recorder — le gros du cours a déjà été transcrit au
+    # fil de l'enregistrement, il ne reste que cette dernière tranche à traiter.
+    tail_audio = live_transcriber.pause()
+
     try:
         duration = recorder.stop(audio_path)
     except Exception as exc:  # noqa: BLE001
@@ -83,16 +89,13 @@ def stop_recording(background_tasks: BackgroundTasks) -> dict:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     storage.update_course(course_id, duree_sec=duration, statut="transcribing")
-    background_tasks.add_task(_process_transcription, course_id)
+    background_tasks.add_task(_finalize_transcription, course_id, tail_audio)
     return {"id": course_id}
 
 
-def _process_transcription(course_id: str) -> None:
-    course_dir = storage.get_course_dir(course_id)
-    audio_path = course_dir / "audio.wav"
-    transcript_path = course_dir / "transcription.txt"
+def _finalize_transcription(course_id: str, tail_audio) -> None:
     try:
-        text = transcriber.transcribe(audio_path, transcript_path)
+        text = live_transcriber.finalize(tail_audio)
         title = storage.derive_title(text)
         storage.update_course(course_id, statut="done", titre=title, erreur=None)
     except Exception as exc:  # noqa: BLE001

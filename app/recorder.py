@@ -20,6 +20,7 @@ class Recorder:
         self._stream: sd.InputStream | None = None
         self._frames: list[np.ndarray] = []
         self._started_at: float | None = None
+        self._peeked_until: int = 0
 
     @property
     def is_recording(self) -> bool:
@@ -32,6 +33,7 @@ class Recorder:
                 raise RuntimeError("Un enregistrement est déjà en cours.")
             self._frames = []
             self._started_at = time.monotonic()
+            self._peeked_until = 0
 
             def callback(indata, frame_count, time_info, status):
                 with self._lock:
@@ -43,6 +45,17 @@ class Recorder:
             stream.start()
             self._stream = stream
 
+    def peek_new_frames(self) -> np.ndarray | None:
+        """Retourne l'audio capturé depuis le dernier appel (mono, float32, 1D),
+        sans perturber l'enregistrement en cours ni ce que stop() écrira au final.
+        Utilisé pour transcrire par tranches pendant l'enregistrement."""
+        with self._lock:
+            new_frames = self._frames[self._peeked_until :]
+            self._peeked_until = len(self._frames)
+        if not new_frames:
+            return None
+        return np.concatenate(new_frames, axis=0)[:, 0]
+
     def stop(self, output_path: Path) -> float:
         with self._lock:
             if self._stream is None:
@@ -51,10 +64,21 @@ class Recorder:
 
         # stream.stop() bloque jusqu'à ce qu'aucun callback ne puisse plus se
         # déclencher ; appelé hors du verrou pour ne pas bloquer un callback en
-        # cours qui attendrait ce même verrou (deadlock). Une fois stop() revenu,
-        # self._frames peut être vidé sans risque qu'un callback tardif y écrive
-        # encore et perde silencieusement la fin de l'enregistrement.
-        stream.stop()
+        # cours qui attendrait ce même verrou (deadlock). Si l'appareil audio a
+        # changé d'état entre-temps (veille prolongée, périphérique déconnecté),
+        # stream.stop()/close() peuvent lever une erreur PortAudio — on ne doit
+        # surtout pas laisser self._stream orphelin dans ce cas, sous peine de
+        # bloquer tout enregistrement futur : on récupère quand même les frames
+        # déjà captées plutôt que de propager l'erreur avant d'avoir nettoyé l'état.
+        stop_error: Exception | None = None
+        try:
+            stream.stop()
+        except Exception as exc:  # noqa: BLE001
+            stop_error = exc
+        try:
+            stream.close()
+        except Exception:  # noqa: BLE001
+            pass
 
         with self._lock:
             frames = self._frames
@@ -63,8 +87,6 @@ class Recorder:
             self._frames = []
             self._started_at = None
 
-        stream.close()
-
         duration = time.monotonic() - started_at if started_at else 0.0
 
         if not frames:
@@ -72,6 +94,10 @@ class Recorder:
 
         audio_data = np.concatenate(frames, axis=0)
         sf.write(str(output_path), audio_data, SAMPLE_RATE)
+
+        if stop_error is not None:
+            print(f"recorder.stop: stream.stop() a échoué mais l'audio a été récupéré : {stop_error!r}")
+
         return duration
 
 
