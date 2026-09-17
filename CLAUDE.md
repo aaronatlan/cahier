@@ -51,16 +51,24 @@ ces éléments) :
 - Ne pas essayer de tout dire : c'est un résumé pour réviser vite, pas une retranscription
   reformulée phrase par phrase.
 
-## Conventions LaTeX
+## Génération de `fiche.tex` et `exercices.tex` : délégation aux agents
 
-- Préambule partagé : `latex/preambule.tex` (macros mathématiques usuelles, `definition` et
-  `correction` en tcolorbox, geometry/hyperref/fancyhdr déjà configurés).
-- Chaque dossier de cours doit rester autonome : copier `latex/preambule.tex` vers
-  `~/Cours/<id>/preambule.tex` avant de générer `fiche.tex`/`exercices.tex`, qui l'importent
-  avec `\input{preambule.tex}` (chemin relatif, pas de dépendance externe).
-- Compiler avec `pdflatex` (`/Library/TeX/texbin/pdflatex`), deux passes si des `\ref`/`\cite`
-  sont utilisés.
-- Le contenu est toujours en anglais (les cours source sont en anglais) sauf demande contraire.
+`fiche.tex` et `exercices.tex` ne sont **pas** écrits directement par la session `/fiche` :
+elle délègue à deux agents définis au niveau du workspace parent (`~/jarvis-starter-kit/.claude/agents/`),
+déjà réglés sur les standards de qualité et de mise en forme voulus par Aaron pour ses fiches MIT :
+
+- **`fiche-cours`** pour `fiche.tex` — encadrés `tcolorbox` colorés par type de contenu
+  (définition/théorème/méthode/formule/exemple/piège), un exemple concret par notion,
+  vérification stricte du sourcing, compilation + relecture visuelle (PNG, `Overfull \hbox`).
+- **`fiche-exo`** pour `exercices.tex` — mêmes standards, exercices à difficulté progressive
+  avec corrigés détaillés, sourcing vérifié, aucun exercice trivial.
+
+Ces agents utilisent leur **propre préambule LaTeX autonome** (embarqué dans chaque `.tex`,
+pas de fichier partagé à copier) et leur propre destination par défaut
+(`livrables/mit/fiche-<nom>/...`) : `/fiche` leur redirige explicitement la sortie vers
+`~/Cours/<id>/fiche.tex` et `~/Cours/<id>/exercices.tex` dans le prompt de délégation (voir
+`.claude/commands/fiche.md`). Ne pas dupliquer leurs instructions de style ici — elles vivent
+dans les fichiers d'agent, source de vérité unique pour éviter toute dérive entre les deux.
 
 ### Priorité des sources : slides d'abord
 
@@ -68,19 +76,5 @@ Fiche et exercices doivent principalement s'appuyer sur **les slides** quand ell
 (structure, définitions, formules telles que présentées par l'enseignant) — c'est la source
 la plus fiable et la mieux organisée. Le résumé/transcript sert de source **secondaire** :
 contexte donné à l'oral, exemples, digressions utiles, questions/réponses. Sans slides,
-structurer directement sur le résumé/transcript.
-
-### `fiche.tex` — fiche de révision
-
-Structure attendue : titre + date du cours, puis sections par concept clé (suivant le plan
-des slides s'il y en a), avec définitions en boîte `definition`, formules importantes, et
-schéma de synthèse si les slides en fournissent un. Concis, pensé pour réviser vite avant un
-examen — pas une retranscription du cours.
-
-### `exercices.tex` — exercices avec corrigés
-
-4 à 6 exercices de difficulté progressive testant la compréhension (pas du par-cœur) du
-contenu des slides s'il y en a (voir "Priorité des sources" ci-dessus), sinon du
-résumé/transcript. Tous les énoncés d'abord, puis, après un `\newpage` et une section
-clairement titrée "Corrections", les corrigés détaillés (boîte `correction`) — pour
-permettre de chercher avant de regarder la réponse (rappel actif).
+structurer directement sur le résumé/transcript. `/fiche` transmet cette priorité aux agents
+dans son prompt de délégation (les agents n'ont pas cette notion de "slides Cahier" par défaut).

@@ -23,22 +23,23 @@ Génère le résumé, la fiche de révision et les exercices pour le cours d'id 
    chronologique de l'oral, pas le plan des slides. C'est un livrable à part entière
    (consultable dans l'app), et il sert aussi de base pour la fiche et les exercices
    ci-dessous.
-5. Copie `latex/preambule.tex` (dans ce projet) vers `~/Cours/$ARGUMENTS/preambule.tex`.
-6. Écris `~/Cours/$ARGUMENTS/fiche.tex` : fiche de révision concise en anglais. **Source
-   principale : les slides** (si présentes) — structure et contenu de la fiche suivent leur
-   plan. Le résumé/transcript sert de source secondaire pour le contexte donné à l'oral, les
-   exemples, les nuances ou digressions utiles qui ne sont pas sur les slides. S'il n'y a pas
-   de slides, structure-toi directement sur le résumé/transcript. Définitions en boîte
-   `definition`, formules importantes mises en avant. Voir `CLAUDE.md` (section "Conventions
-   LaTeX") pour le détail du style attendu.
-7. Écris `~/Cours/$ARGUMENTS/exercices.tex` : 4 à 6 exercices progressifs testant la
-   compréhension (pas du par-cœur). **Source principale : les slides** (si présentes),
-   éclairés par ce qui a été dit à l'oral (exemples donnés en cours, questions d'élèves et
-   réponses, etc.). S'il n'y a pas de slides, structure-toi directement sur le
-   résumé/transcript. Tous les énoncés d'abord, puis après `\newpage` une section
-   "Corrections" avec les corrigés détaillés en boîte `correction`.
-8. Compile les deux fichiers avec `pdflatex` depuis `~/Cours/$ARGUMENTS/` (deux passes) pour
-   produire `fiche.pdf` et `exercices.pdf`. Si la compilation échoue, corrige le `.tex` et
-   recompile plutôt que d'abandonner.
-9. Termine par un résumé court : titre du cours, nombre d'exercices générés, et confirmation
+5. Lance l'agent **`fiche-cours`** (outil Agent) pour écrire `fiche.tex`. Dans le prompt,
+   donne-lui explicitement :
+   - le dossier support : `~/Cours/$ARGUMENTS/` avec `slides/texte.txt` + `slides/page-XX.png`
+     (s'ils existent), `resume.md`, `transcription.txt` ;
+   - la priorité des sources : **slides d'abord** si présentes (structure et contenu suivent
+     leur plan), résumé/transcript en secondaire (contexte oral, exemples, digressions) ;
+     sans slides, se baser directement sur le résumé/transcript ;
+   - le titre du cours, la matière et la date (lus à l'étape 1) ;
+   - la destination exacte : sauvegarder dans `~/Cours/$ARGUMENTS/fiche.tex` (pas
+     `livrables/mit/...`, sa destination par défaut), compiler depuis ce dossier pour produire
+     `fiche.pdf` au même endroit.
+   L'agent lit lui-même les supports, écrit, compile et vérifie le rendu (Overfull hbox, PNG) :
+   pas besoin de relire son travail en détail, juste confirmer que `fiche.pdf` existe au retour.
+6. Lance l'agent **`fiche-exo`** (outil Agent) pour écrire `exercices.tex`, avec le même
+   contexte support/priorité/destination qu'à l'étape précédente (adapter le chemin en
+   `~/Cours/$ARGUMENTS/exercices.tex` / `exercices.pdf`). Si `fiche.tex` vient d'être généré à
+   l'étape précédente, mentionne son chemin pour que l'agent l'utilise comme checklist de
+   couverture des notions (comme il le ferait avec une fiche dans `livrables/mit/`).
+7. Termine par un résumé court : titre du cours, nombre d'exercices générés, et confirmation
    que `resume.md`, `fiche.pdf` et `exercices.pdf` sont bien présents dans le dossier.
