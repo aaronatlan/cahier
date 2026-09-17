@@ -27,6 +27,15 @@ class Recorder:
         with self._lock:
             return self._stream is not None
 
+    @property
+    def elapsed_sec(self) -> float:
+        """Durée écoulée depuis start(), pour permettre au frontend de rafficher
+        un chronomètre cohérent s'il a perdu le fil (ex. navigation ailleurs)."""
+        with self._lock:
+            if self._started_at is None:
+                return 0.0
+            return time.monotonic() - self._started_at
+
     def start(self) -> None:
         with self._lock:
             if self._stream is not None:

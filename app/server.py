@@ -56,7 +56,11 @@ def get_subjects() -> list[dict]:
 
 @app.get("/api/record/status")
 def record_status() -> dict:
-    return {"recording": recorder.is_recording, "id": _current_course_id}
+    return {
+        "recording": recorder.is_recording,
+        "id": _current_course_id,
+        "elapsed_sec": recorder.elapsed_sec,
+    }
 
 
 class StartRecordingBody(BaseModel):
@@ -162,6 +166,13 @@ def rename_course(course_id: str, body: RenameBody) -> dict:
 
 @app.delete("/api/courses/{course_id}")
 def delete_course(course_id: str) -> dict:
+    if course_id == _current_course_id:
+        # Supprimer le dossier pendant que le micro enregistre encore dessus
+        # laisse le recorder tourner indéfiniment vers un dossier qui n'existe
+        # plus plus moyen de l'arrêter proprement, micro resté allumé.
+        raise HTTPException(
+            status_code=409, detail="Arrête l'enregistrement avant de supprimer ce cours."
+        )
     if not storage.delete_course(course_id):
         raise HTTPException(status_code=404, detail="Cours introuvable.")
     return {"ok": True}

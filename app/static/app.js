@@ -93,9 +93,16 @@
     loadCourses();
   }
 
-  function goRecording() {
+  async function goRecording() {
     showScreen("recording");
     resetRecordUI();
+    // Si un enregistrement tourne déjà côté serveur (ex. l'utilisateur a navigué
+    // ailleurs sans arrêter), on se raccroche dessus au lieu de perdre tout accès
+    // à un bouton Stop fonctionnel pendant que le micro continue de tourner.
+    const status = await api("/api/record/status").catch(() => null);
+    if (status && status.recording) {
+      enterRecordingUI(status.elapsed_sec || 0);
+    }
   }
 
   // --- Bibliothèque ---------------------------------------------------
@@ -288,6 +295,18 @@
     $("#record-timer").textContent = formatTimer(elapsed);
   }
 
+  function enterRecordingUI(elapsedSec) {
+    state.recState = "recording";
+    state.recordStartedAt = Date.now() - elapsedSec * 1000;
+    $("#record-btn").className = "record-btn is-recording";
+    $("#record-icon").className = "record-icon is-recording";
+    $("#record-status").textContent = "Enregistrement…";
+    $("#subject-select").disabled = true;
+    tick();
+    clearInterval(state.timerInterval);
+    state.timerInterval = setInterval(tick, 500);
+  }
+
   async function startRecording() {
     try {
       await api("/api/record/start", {
@@ -299,14 +318,7 @@
       $("#record-status").textContent = err.message;
       return;
     }
-    state.recState = "recording";
-    state.recordStartedAt = Date.now();
-    $("#record-btn").className = "record-btn is-recording";
-    $("#record-icon").className = "record-icon is-recording";
-    $("#record-status").textContent = "Enregistrement…";
-    $("#subject-select").disabled = true;
-    tick();
-    state.timerInterval = setInterval(tick, 500);
+    enterRecordingUI(0);
   }
 
   async function stopRecording() {
