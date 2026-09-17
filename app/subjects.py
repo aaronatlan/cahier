@@ -5,6 +5,7 @@ SUBJECTS = [
     {"code": "6.7960", "titre": "Deep Learning"},
     {"code": "6.C57", "titre": "Optimization Methods"},
     {"code": "18.675", "titre": "Theory of Probability"},
+    {"code": "autres", "titre": "Autres"},
 ]
 
 UNCLASSIFIED_CODE = ""
