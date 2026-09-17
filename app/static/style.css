@@ -428,6 +428,7 @@ button, input, select {
   padding-left: 20px;
 }
 .markdown-view li { margin-bottom: 5px; }
+.markdown-view li.sub { margin-left: 20px; list-style-type: circle; }
 .markdown-view p { margin: 0 0 12px; }
 .markdown-view strong { font-weight: 640; }
 

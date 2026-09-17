@@ -74,6 +74,7 @@ def _enrich(meta: dict, course_dir: Path) -> dict:
     meta.setdefault("matiere", "")
     meta["matiere_titre"] = subjects_module.subject_title(meta["matiere"])
     meta["a_des_slides"] = (course_dir / "slides" / "source.pdf").exists()
+    meta["resume_ok"] = (course_dir / "resume.md").exists()
     fiche_ok = (course_dir / "fiche.pdf").exists()
     exercices_ok = (course_dir / "exercices.pdf").exists()
     meta["statut_fiche"] = "genere" if (fiche_ok and exercices_ok) else "absent"

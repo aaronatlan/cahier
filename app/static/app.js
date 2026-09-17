@@ -236,40 +236,39 @@
 
     const lines = md.replace(/\r\n/g, "\n").split("\n");
     let html = "";
-    let listDepth = 0;
+    let inList = false;
 
-    const closeLists = (toDepth) => {
-      while (listDepth > toDepth) {
+    const closeList = () => {
+      if (inList) {
         html += "</ul>";
-        listDepth--;
+        inList = false;
       }
     };
 
     for (const rawLine of lines) {
       const line = rawLine.trimEnd();
-      const heading = /^(#{2,3})\s+(.*)$/.exec(line);
+      const heading = /^(#{1,6})\s*(.*)$/.exec(line);
       const bullet = /^(\s*)[-*]\s+(.*)$/.exec(line);
 
       if (heading) {
-        closeLists(0);
-        const tag = heading[1].length === 2 ? "h2" : "h3";
+        closeList();
+        const tag = heading[1].length <= 2 ? "h2" : "h3";
         html += `<${tag}>${inline(heading[2])}</${tag}>`;
       } else if (bullet) {
-        const depth = Math.floor(bullet[1].length / 2) + 1;
-        if (listDepth > depth) closeLists(depth);
-        while (listDepth < depth) {
+        if (!inList) {
           html += "<ul>";
-          listDepth++;
+          inList = true;
         }
-        html += `<li>${inline(bullet[2])}</li>`;
+        const isSub = bullet[1].length > 0;
+        html += `<li${isSub ? ' class="sub"' : ""}>${inline(bullet[2])}</li>`;
       } else if (line.trim() === "") {
-        closeLists(0);
+        closeList();
       } else {
-        closeLists(0);
+        closeList();
         html += `<p>${inline(line.trim())}</p>`;
       }
     }
-    closeLists(0);
+    closeList();
     return html;
   }
 
@@ -373,16 +372,9 @@
   }
 
   function renderResume(course) {
-    const text = $("#resume-text");
-    const empty = $("#resume-empty");
-    if (course.resume) {
-      text.hidden = false;
-      empty.hidden = true;
-      text.innerHTML = renderMarkdown(course.resume);
-    } else {
-      text.hidden = true;
-      empty.hidden = false;
-    }
+    const ready = Boolean(course.resume);
+    setReadyState($("#resume-text"), $("#resume-empty"), ready);
+    if (ready) $("#resume-text").innerHTML = renderMarkdown(course.resume);
   }
 
   function renderSlides(course) {
@@ -400,18 +392,18 @@
   }
 
   function renderPaper(kind, ready, courseId) {
-    const paper = $(`#${kind}-paper`);
-    const empty = $(`#${kind}-empty`);
     const embed = $(`#${kind}-embed`);
+    setReadyState($(`#${kind}-paper`), $(`#${kind}-empty`), ready);
     if (ready) {
-      paper.hidden = false;
-      empty.hidden = true;
       embed.src = `/api/courses/${courseId}/file/${kind}.pdf`;
     } else {
-      paper.hidden = true;
-      empty.hidden = false;
       embed.removeAttribute("src");
     }
+  }
+
+  function setReadyState(shownEl, emptyEl, ready) {
+    shownEl.hidden = !ready;
+    emptyEl.hidden = ready;
   }
 
   async function deleteCurrentCourse() {

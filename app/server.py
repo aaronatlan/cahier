@@ -107,6 +107,15 @@ def list_courses() -> list[dict]:
     return storage.list_courses()
 
 
+def _read_text_or_empty(path: Path) -> str:
+    if not path.exists():
+        return ""
+    try:
+        return path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        return ""
+
+
 @app.get("/api/courses/{course_id}")
 def get_course(course_id: str) -> dict:
     meta = storage.get_course(course_id)
@@ -114,13 +123,8 @@ def get_course(course_id: str) -> dict:
         raise HTTPException(status_code=404, detail="Cours introuvable.")
 
     course_dir = storage.get_course_dir(course_id)
-    transcript_path = course_dir / "transcription.txt"
-    meta["transcription"] = (
-        transcript_path.read_text(encoding="utf-8") if transcript_path.exists() else ""
-    )
-
-    resume_path = course_dir / "resume.md"
-    meta["resume"] = resume_path.read_text(encoding="utf-8") if resume_path.exists() else ""
+    meta["transcription"] = _read_text_or_empty(course_dir / "transcription.txt")
+    meta["resume"] = _read_text_or_empty(course_dir / "resume.md")
 
     slides_dir = course_dir / "slides"
     pages = sorted(slides_dir.glob("page-*.png")) if slides_dir.exists() else []

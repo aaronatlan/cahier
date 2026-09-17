@@ -73,7 +73,8 @@ examen — pas une retranscription du cours.
 
 ### `exercices.tex` — exercices avec corrigés
 
-4 à 6 exercices de difficulté progressive testant la compréhension du cours (pas du
-par-cœur). Tous les énoncés d'abord, puis, après un `\newpage` et une section clairement
-titrée "Corrections", les corrigés détaillés (boîte `correction`) — pour permettre de
-chercher avant de regarder la réponse (rappel actif).
+4 à 6 exercices de difficulté progressive testant la compréhension (pas du par-cœur) du
+contenu des slides s'il y en a (voir "Priorité des sources" ci-dessus), sinon du
+résumé/transcript. Tous les énoncés d'abord, puis, après un `\newpage` et une section
+clairement titrée "Corrections", les corrigés détaillés (boîte `correction`) — pour
+permettre de chercher avant de regarder la réponse (rappel actif).

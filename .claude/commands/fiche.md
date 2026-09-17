@@ -9,7 +9,9 @@ Génère le résumé, la fiche de révision et les exercices pour le cours d'id 
    partir du code). Si le dossier n'existe pas, dis-le clairement et arrête-toi.
 2. Lis `~/Cours/$ARGUMENTS/transcription.txt`. C'est une transcription brute (whisper) : peu
    ponctuée, parfois hachée, mélange de langues sur les hésitations — pas lisible telle
-   quelle.
+   quelle. Si elle est vide ou ne contient que du bruit (quelques mots sans rapport, ex. un
+   enregistrement qui a échoué), dis-le clairement et arrête-toi plutôt que d'inventer un
+   résumé, une fiche ou des exercices à partir de rien.
 3. Si `~/Cours/$ARGUMENTS/slides/` existe : lis `slides/texte.txt`, et regarde chaque
    `slides/page-XX.png` avec l'outil Read (ce sont des images) pour capter les schémas,
    graphes et formules que le texte extrait ne rend pas bien.
@@ -26,10 +28,11 @@ Génère le résumé, la fiche de révision et les exercices pour le cours d'id 
    `definition`, formules importantes mises en avant. Voir `CLAUDE.md` (section "Conventions
    LaTeX") pour le détail du style attendu.
 7. Écris `~/Cours/$ARGUMENTS/exercices.tex` : 4 à 6 exercices progressifs testant la
-   compréhension (pas du par-cœur) du contenu des slides, éclairés par ce qui a été dit à
-   l'oral (exemples donnés en cours, questions d'élèves et réponses, etc.). Tous les énoncés
-   d'abord, puis après `\newpage` une section "Corrections" avec les corrigés détaillés en
-   boîte `correction`.
+   compréhension (pas du par-cœur). **Source principale : les slides** (si présentes),
+   éclairés par ce qui a été dit à l'oral (exemples donnés en cours, questions d'élèves et
+   réponses, etc.). S'il n'y a pas de slides, structure-toi directement sur le
+   résumé/transcript. Tous les énoncés d'abord, puis après `\newpage` une section
+   "Corrections" avec les corrigés détaillés en boîte `correction`.
 8. Compile les deux fichiers avec `pdflatex` depuis `~/Cours/$ARGUMENTS/` (deux passes) pour
    produire `fiche.pdf` et `exercices.pdf`. Si la compilation échoue, corrige le `.tex` et
    recompile plutôt que d'abandonner.
