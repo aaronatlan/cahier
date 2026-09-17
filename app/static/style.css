@@ -360,6 +360,7 @@ button, input, select {
 
 /* --- Vue Détail --- */
 
+#view-detail { display: flex; flex-direction: column; }
 .detail-top { flex: none; padding: 20px 40px 0; }
 
 .detail-heading {
