@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import shutil
+import subprocess
+import threading
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -34,6 +37,29 @@ app = FastAPI(title="Cahier")
 app.mount("/static", NoCacheStaticFiles(directory=STATIC_DIR), name="static")
 
 _current_course_id: Optional[str] = None
+
+# --- Génération résumé/fiche/exercices via /fiche (Claude Code CLI) --------
+
+CAHIER_ROOT = Path(__file__).resolve().parent.parent
+# Chemin absolu : les apps GUI lancées depuis le Finder n'héritent pas du PATH
+# du shell (~/.zshrc etc.), un simple "claude" ne serait pas trouvé — même
+# raison que le chemin absolu déjà utilisé pour pdflatex (voir CLAUDE.md).
+CLAUDE_BIN = str(Path.home() / ".local" / "bin" / "claude")
+GENERATION_STALE_SEC = 30 * 60  # au-delà, on considère le verrou abandonné
+
+_generation_procs: dict[str, subprocess.Popen] = {}
+
+
+def _generation_lock_path(course_dir: Path) -> Path:
+    return course_dir / ".generating"
+
+
+def _generation_running(course_dir: Path) -> bool:
+    lock_path = _generation_lock_path(course_dir)
+    if not lock_path.exists():
+        return False
+    age = time.time() - lock_path.stat().st_mtime
+    return age < GENERATION_STALE_SEC
 
 
 @app.on_event("startup")
@@ -218,12 +244,52 @@ def delete_slide_page(course_id: str, page_number: int) -> dict:
     return {"pages": remaining}
 
 
-@app.get("/api/courses/{course_id}/prompt-fiche")
-def prompt_fiche(course_id: str) -> dict:
+@app.post("/api/courses/{course_id}/generate")
+def start_generation(course_id: str) -> dict:
     meta = storage.get_course(course_id)
     if meta is None:
         raise HTTPException(status_code=404, detail="Cours introuvable.")
-    return {"prompt": f"/fiche {course_id}"}
+    course_dir = storage.get_course_dir(course_id)
+    if _generation_running(course_dir):
+        raise HTTPException(status_code=409, detail="Génération déjà en cours pour ce cours.")
+
+    lock_path = _generation_lock_path(course_dir)
+    lock_path.write_text("", encoding="utf-8")
+    log_file = (course_dir / "generation.log").open("w", encoding="utf-8")
+    proc = subprocess.Popen(
+        [
+            CLAUDE_BIN,
+            "-p",
+            f"/fiche {course_id}",
+            "--permission-mode",
+            "acceptEdits",
+            "--allowedTools",
+            "Read Write Edit Bash Grep Glob WebSearch WebFetch Agent",
+        ],
+        cwd=str(CAHIER_ROOT),
+        stdout=log_file,
+        stderr=subprocess.STDOUT,
+    )
+    _generation_procs[course_id] = proc
+
+    def _watch() -> None:
+        proc.wait()
+        log_file.close()
+        lock_path.unlink(missing_ok=True)
+
+    threading.Thread(target=_watch, daemon=True).start()
+    return {"ok": True}
+
+
+@app.get("/api/courses/{course_id}/generate/status")
+def generation_status(course_id: str) -> dict:
+    course_dir = storage.get_course_dir(course_id)
+    if _generation_running(course_dir):
+        return {"state": "running"}
+    proc = _generation_procs.get(course_id)
+    if proc is None:
+        return {"state": "idle"}
+    return {"state": "done" if proc.returncode == 0 else "error", "exit_code": proc.returncode}
 
 
 @app.get("/api/courses/{course_id}/file/{file_path:path}")

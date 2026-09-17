@@ -2,8 +2,10 @@
 
 Ce dossier contient l'app **Cahier** d'Aaron : enregistrement micro, transcription locale
 (faster-whisper, anglais), et bibliothèque de cours groupée par matière MIT. Les fiches de
-révision et exercices ne sont **pas** générés automatiquement par l'app (pas de clé API
-embarquée) — c'est fait ici, à la demande, par Claude Code.
+révision et exercices ne sont **pas** générées par une clé API embarquée dans l'app — le
+bouton "Générer avec Claude Code" lance le CLI `claude` déjà authentifié sur la machine
+d'Aaron (voir section "Génération à la demande" ci-dessous), à la demande, jamais en fond
+sans action explicite de l'utilisateur.
 
 ## Où sont les données
 
@@ -16,12 +18,23 @@ Chaque cours est un dossier `~/Cours/<id>/` (hors de ce repo) contenant :
 - `resume.md` — résumé lisible de la transcription (voir section "Résumé" ci-dessous)
 - `fiche.tex` / `fiche.pdf`, `exercices.tex` / `exercices.pdf` — générés par la commande `/fiche`
 
-## Générer le résumé, la fiche + les exercices
+## Génération à la demande (résumé, fiche, exercices)
 
-Utiliser la commande `/fiche <id-du-cours>` (voir `.claude/commands/fiche.md`) — malgré son
-nom elle génère les trois : `resume.md`, `fiche.tex` et `exercices.tex`. L'app affiche l'id
-et propose un bouton "Copier la demande pour Claude Code" qui copie directement `/fiche <id>`
-dans le presse-papiers.
+La commande `/fiche <id-du-cours>` (voir `.claude/commands/fiche.md`) génère les trois :
+`resume.md`, `fiche.tex` et `exercices.tex`. Deux façons de la lancer :
+
+- **Depuis l'app** : le bouton "Générer avec Claude Code" (onglets Résumé/Fiche/Exercices
+  quand ils sont vides) appelle `POST /api/courses/{id}/generate`, qui lance directement
+  `claude -p "/fiche <id>"` en sous-processus (chemin absolu vers le binaire, `--permission-mode
+  acceptEdits` + `--allowedTools` scopé à Read/Write/Edit/Bash/Grep/Glob/WebSearch/WebFetch/Agent
+  — pas `--dangerously-skip-permissions`, qui bypasserait tout le système de permissions).
+  Un fichier verrou `.generating` dans le dossier du cours empêche un double lancement (y
+  compris après un redémarrage de l'app) et expire après 30 min s'il est resté orphelin ;
+  la sortie du process est journalisée dans `generation.log`. L'app poll `GET
+  /api/courses/{id}/generate/status` pour savoir quand rafraîchir l'affichage.
+- **Depuis une session Claude Code ouverte dans ce dossier** (`.claude/commands/fiche.md`
+  n'est reconnu que si la session est rootée ici, pas à la racine du workspace parent) :
+  taper directement `/fiche <id>`.
 
 ## Résumé (`resume.md`)
 

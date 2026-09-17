@@ -13,6 +13,7 @@
     recordStartedAt: null,
     timerInterval: null,
     pollInterval: null,
+    generationPollInterval: null,
   };
 
   const $ = (sel) => document.querySelector(sel);
@@ -382,6 +383,16 @@
     renderSlides(course);
     renderPaper("fiche", course.fiche_pdf, id);
     renderPaper("exercices", course.exercices_pdf, id);
+
+    // Si une génération est déjà en cours pour ce cours (ex. lancée puis on a
+    // navigué ailleurs), se raccrocher dessus plutôt que de perdre le suivi.
+    const genStatus = await api(`/api/courses/${id}/generate/status`).catch(() => null);
+    if (genStatus && genStatus.state === "running") {
+      setGenerationUI(true);
+      pollGeneration(id);
+    } else {
+      setGenerationUI(false);
+    }
   }
 
   function renderResume(course) {
@@ -596,25 +607,51 @@
     }
   }
 
-  async function copyPrompt(kind) {
+  // --- Génération résumé/fiche/exercices (via le CLI Claude Code) --------
+
+  function setGenerationUI(generating, message) {
+    $$(".generate-btn").forEach((btn) => {
+      btn.disabled = generating;
+      btn.textContent = generating ? "Génération en cours…" : "Générer avec Claude Code";
+    });
+    $$(".generate-status").forEach((el) => {
+      el.hidden = !message;
+      el.textContent = message || "";
+    });
+  }
+
+  async function startGeneration() {
     if (!state.currentId) return;
-    let text;
+    const courseId = state.currentId;
     try {
-      ({ prompt: text } = await api(`/api/courses/${state.currentId}/prompt-fiche`));
+      await api(`/api/courses/${courseId}/generate`, { method: "POST" });
     } catch (err) {
       alert(err.message);
       return;
     }
-    const hint = document.querySelector(`.copied-hint[data-hint="${kind}"]`);
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch (err) {
-      window.prompt("Copie cette demande (Cmd+C) et colle-la dans Claude Code :", text);
-    }
-    if (hint) {
-      hint.hidden = false;
-      setTimeout(() => { hint.hidden = true; }, 1500);
-    }
+    setGenerationUI(true);
+    pollGeneration(courseId);
+  }
+
+  function pollGeneration(courseId) {
+    clearInterval(state.generationPollInterval);
+    state.generationPollInterval = setInterval(async () => {
+      const status = await api(`/api/courses/${courseId}/generate/status`).catch(() => null);
+      if (!status || status.state === "running") return;
+      clearInterval(state.generationPollInterval);
+      if (state.currentId !== courseId) return;
+      if (status.state === "error") {
+        setGenerationUI(false, "Échec de la génération (voir generation.log dans le dossier du cours).");
+        return;
+      }
+      setGenerationUI(false);
+      const course = await refreshCourse(courseId);
+      if (course) {
+        renderResume(course);
+        renderPaper("fiche", course.fiche_pdf, courseId);
+        renderPaper("exercices", course.exercices_pdf, courseId);
+      }
+    }, 3000);
   }
 
   // --- Setup ---------------------------------------------------
@@ -656,8 +693,8 @@
       tab.addEventListener("click", () => switchTab(tab.dataset.tab))
     );
 
-    $$(".copy-prompt-btn").forEach((btn) =>
-      btn.addEventListener("click", () => copyPrompt(btn.dataset.target))
+    $$(".generate-btn").forEach((btn) =>
+      btn.addEventListener("click", startGeneration)
     );
 
     const dropzone = $("#slides-dropzone");

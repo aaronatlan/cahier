@@ -21,10 +21,11 @@ Ouvre **Cahier** depuis le Dock ou Spotlight. Aucun terminal à ouvrir.
    module concerné avant de lancer).
 2. La transcription se lance automatiquement (anglais, pas de traduction).
 3. Ajoute les slides du cours (PDF) dans l'onglet **Slides** si tu en as.
-4. Onglets **Fiche** / **Exercices** : bouton "Copier la demande pour Claude
-   Code" → colle-la dans une session Claude Code ouverte dans ce dossier
-   (`livrables/applications/cahier`) → la fiche et les exercices sont générés
-   en LaTeX et compilés en PDF, consultables directement dans l'app.
+4. Onglets **Résumé** / **Fiche** / **Exercices** : bouton "Générer avec
+   Claude Code" → lance directement le CLI `claude` en fond (pas de
+   copier-coller, pas de terminal) ; résumé, fiche et exercices sont générés
+   et la fiche/les exercices compilés en PDF, consultables directement dans
+   l'app une fois prêts.
 
 Tous les cours sont stockés dans `~/Cours/<id>/` (audio, transcription,
 slides, fiche/exercices).
