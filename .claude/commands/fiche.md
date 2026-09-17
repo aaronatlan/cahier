@@ -16,9 +16,13 @@ Génère le résumé, la fiche de révision et les exercices pour le cours d'id 
    `slides/page-XX.png` avec l'outil Read (ce sont des images) pour capter les schémas,
    graphes et formules que le texte extrait ne rend pas bien.
 4. Écris `~/Cours/$ARGUMENTS/resume.md` : un résumé propre et lisible de la transcription,
-   façon page Notion (voir `CLAUDE.md` section "Résumé" pour le format exact). C'est un
-   livrable à part entière (consultable dans l'app), et il sert aussi de base pour la fiche
-   et les exercices ci-dessous.
+   façon page Notion (voir `CLAUDE.md` section "Résumé" pour le format exact). Si des slides
+   existent, appuie-toi dessus pour clarifier ce que la transcription rend mal (termes
+   techniques, formules, noms propres mal transcrits par whisper) — le prof les affiche en
+   parlant, donc elles font autorité sur le vocabulaire exact même si le résumé suit le fil
+   chronologique de l'oral, pas le plan des slides. C'est un livrable à part entière
+   (consultable dans l'app), et il sert aussi de base pour la fiche et les exercices
+   ci-dessous.
 5. Copie `latex/preambule.tex` (dans ce projet) vers `~/Cours/$ARGUMENTS/preambule.tex`.
 6. Écris `~/Cours/$ARGUMENTS/fiche.tex` : fiche de révision concise en anglais. **Source
    principale : les slides** (si présentes) — structure et contenu de la fiche suivent leur

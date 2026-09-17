@@ -30,6 +30,12 @@ passages qui changent de langue. `resume.md` la transforme en résumé structur�
 scannable, façon page Notion. C'est un livrable en soi (affiché dans l'app, onglet
 "Résumé"), et sert aussi de source secondaire pour la fiche et les exercices.
 
+Si des slides existent pour le cours, s'en servir pour clarifier ce que la transcription
+rend mal : termes techniques, formules, noms propres — le prof les affiche au tableau en
+parlant, elles font donc autorité sur le vocabulaire exact. Le résumé garde toutefois la
+structure chronologique de l'oral (voir format ci-dessous), il ne suit pas le plan des
+slides comme le fait la fiche.
+
 Format à suivre (markdown simple, rendu par un mini-parseur maison dans l'app — s'en tenir à
 ces éléments) :
 - Une section `## Overview` en premier : 2-4 puces qui donnent le contexte général (sujet de
