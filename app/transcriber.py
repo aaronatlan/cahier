@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import threading
 from pathlib import Path
 
 MODEL_SIZE = "medium"
 LANGUAGE = "en"  # cours toujours en anglais, pas de détection auto ni de traduction
 
 _model = None
+_lock = threading.Lock()
 
 
 def _get_model():
@@ -28,14 +30,19 @@ def format_timestamp(seconds: float) -> str:
 
 
 def transcribe(audio_path: Path, transcript_path: Path) -> str:
-    model = _get_model()
-    segments, _info = model.transcribe(str(audio_path), language=LANGUAGE, task="transcribe")
+    # Un seul modèle Whisper partagé : on sérialise les transcriptions pour éviter
+    # deux inférences concurrentes sur la même instance (non garanti thread-safe côté
+    # faster-whisper/CTranslate2) si un nouvel enregistrement est lancé pendant qu'une
+    # transcription précédente tourne encore en tâche de fond.
+    with _lock:
+        model = _get_model()
+        segments, _info = model.transcribe(str(audio_path), language=LANGUAGE, task="transcribe")
 
-    lines = []
-    for segment in segments:
-        start = format_timestamp(segment.start)
-        lines.append(f"[{start}] {segment.text.strip()}")
+        lines = []
+        for segment in segments:
+            start = format_timestamp(segment.start)
+            lines.append(f"[{start}] {segment.text.strip()}")
 
-    text = "\n".join(lines)
-    transcript_path.write_text(text, encoding="utf-8")
-    return text
+        text = "\n".join(lines)
+        transcript_path.write_text(text, encoding="utf-8")
+        return text
