@@ -14,6 +14,8 @@ from . import transcriber
 from .recorder import SAMPLE_RATE, recorder
 
 CHUNK_INTERVAL_SEC = 60.0
+MAX_CHUNK_SEC = 120.0  # borne une tranche même si la transcription prend du retard
+OFFSET_FILENAME = ".transcribed_until"  # jusqu'où (en s) l'audio est déjà transcrit
 
 
 class LiveTranscriber:
@@ -36,10 +38,19 @@ class LiveTranscriber:
 
     def _run(self) -> None:
         while not self._stop_event.wait(CHUNK_INTERVAL_SEC):
-            self._process_available()
+            self._drain()
 
-    def _process_available(self) -> None:
-        self._process(recorder.peek_new_frames())
+    def _drain(self) -> None:
+        # Si Whisper est plus lent que le temps réel, on traite le retard tranche
+        # par tranche (au lieu d'un seul bloc géant) en vérifiant l'arrêt entre deux.
+        max_samples = int(MAX_CHUNK_SEC * SAMPLE_RATE)
+        while not self._stop_event.is_set():
+            audio = recorder.peek_new_frames(max_samples=max_samples)
+            if audio is None:
+                return
+            self._process(audio)
+            if len(audio) < max_samples:
+                return
 
     def _process(self, audio: np.ndarray | None) -> None:
         if audio is None or len(audio) == 0:
@@ -59,21 +70,25 @@ class LiveTranscriber:
                 if self._transcript_path is not None:
                     with self._transcript_path.open("a", encoding="utf-8") as f:
                         f.write(text + "\n")
+            if self._transcript_path is not None:
+                offset_path = self._transcript_path.parent / OFFSET_FILENAME
+                offset_path.write_text(str(self._offset_sec), encoding="utf-8")
 
-    def pause(self) -> np.ndarray | None:
-        """Arrête la boucle périodique et renvoie la dernière tranche non encore
-        traitée, sans la transcrire. À appeler avant recorder.stop(), tant que le
-        buffer du recorder existe encore, pour ne rien manquer de la fin du cours."""
+    def signal_stop(self) -> None:
+        """Demande l'arrêt de la boucle périodique, sans attendre : à appeler avant
+        recorder.stop() pour que le micro se coupe immédiatement."""
         self._stop_event.set()
-        if self._thread:
-            self._thread.join(timeout=CHUNK_INTERVAL_SEC + 60)
-            self._thread = None
-        return recorder.peek_new_frames()
 
     def finalize(self, tail_audio: np.ndarray | None) -> str:
-        """Transcrit la dernière tranche (capturée par pause()) et renvoie le texte
-        complet du cours. Peut prendre quelques secondes : à lancer en tâche de fond."""
+        """Attend la fin de la tranche en cours, transcrit la dernière tranche
+        (renvoyée par recorder.stop()) et renvoie le texte complet du cours. Peut
+        prendre du temps : à lancer en tâche de fond."""
+        if self._thread is not None:
+            self._thread.join()
+            self._thread = None
         self._process(tail_audio)
+        if self._transcript_path is not None:
+            (self._transcript_path.parent / OFFSET_FILENAME).unlink(missing_ok=True)
         return "\n".join(self._chunks)
 
 

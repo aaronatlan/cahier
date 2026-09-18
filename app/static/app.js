@@ -13,7 +13,7 @@
     recordStartedAt: null,
     timerInterval: null,
     pollInterval: null,
-    generationPollInterval: null,
+    generationPollIntervals: {}, // kind -> interval id
   };
 
   const $ = (sel) => document.querySelector(sel);
@@ -386,14 +386,16 @@
     renderPaper("fiche", course.fiche_pdf, id);
     renderPaper("exercices", course.exercices_pdf, id);
 
-    // Si une génération est déjà en cours pour ce cours (ex. lancée puis on a
+    // Si des générations sont déjà en cours pour ce cours (ex. lancées puis on a
     // navigué ailleurs), se raccrocher dessus plutôt que de perdre le suivi.
-    const genStatus = await api(`/api/courses/${id}/generate/status`).catch(() => null);
-    if (genStatus && genStatus.state === "running") {
-      setGenerationUI(true);
-      pollGeneration(id);
-    } else {
-      setGenerationUI(false);
+    for (const kind of GENERATION_KINDS) {
+      const genStatus = await api(`/api/courses/${id}/generate/${kind}/status`).catch(() => null);
+      if (genStatus && genStatus.state === "running") {
+        setGenerationUI(kind, true);
+        pollGeneration(kind, id);
+      } else {
+        setGenerationUI(kind, false);
+      }
     }
   }
 
@@ -610,43 +612,50 @@
   }
 
   // --- Génération résumé/fiche/exercices (via le CLI Claude Code) --------
+  // Chaque onglet déclenche uniquement son propre livrable (/resume, /fiche,
+  // /exercices), indépendamment des deux autres.
 
-  function setGenerationUI(generating, message) {
-    $$(".generate-btn").forEach((btn) => {
+  const GENERATION_KINDS = ["resume", "fiche", "exercices"];
+
+  function setGenerationUI(kind, generating, message) {
+    $$(`.generate-btn[data-kind="${kind}"]`).forEach((btn) => {
       btn.disabled = generating;
       btn.textContent = generating ? "Génération en cours…" : "Générer avec Claude Code";
     });
-    $$(".generate-status").forEach((el) => {
+    $$(`.generate-status[data-kind="${kind}"]`).forEach((el) => {
       el.hidden = !message;
       el.textContent = message || "";
     });
   }
 
-  async function startGeneration() {
+  async function startGeneration(kind) {
     if (!state.currentId) return;
     const courseId = state.currentId;
     try {
-      await api(`/api/courses/${courseId}/generate`, { method: "POST" });
+      await api(`/api/courses/${courseId}/generate/${kind}`, { method: "POST" });
     } catch (err) {
       alert(err.message);
       return;
     }
-    setGenerationUI(true);
-    pollGeneration(courseId);
+    setGenerationUI(kind, true);
+    pollGeneration(kind, courseId);
   }
 
-  function pollGeneration(courseId) {
-    clearInterval(state.generationPollInterval);
-    state.generationPollInterval = setInterval(async () => {
-      const status = await api(`/api/courses/${courseId}/generate/status`).catch(() => null);
+  function pollGeneration(kind, courseId) {
+    clearInterval(state.generationPollIntervals[kind]);
+    state.generationPollIntervals[kind] = setInterval(async () => {
+      const status = await api(`/api/courses/${courseId}/generate/${kind}/status`).catch(() => null);
       if (!status || status.state === "running") return;
-      clearInterval(state.generationPollInterval);
+      clearInterval(state.generationPollIntervals[kind]);
       if (state.currentId !== courseId) return;
       if (status.state === "error") {
-        setGenerationUI(false, "Échec de la génération (voir generation.log dans le dossier du cours).");
+        setGenerationUI(
+          kind, false,
+          `Échec de la génération (voir generation-${kind}.log dans le dossier du cours).`
+        );
         return;
       }
-      setGenerationUI(false);
+      setGenerationUI(kind, false);
       const course = await refreshCourse(courseId);
       if (course) {
         renderResume(course);
@@ -696,7 +705,7 @@
     );
 
     $$(".generate-btn").forEach((btn) =>
-      btn.addEventListener("click", startGeneration)
+      btn.addEventListener("click", () => startGeneration(btn.dataset.kind))
     );
 
     const dropzone = $("#slides-dropzone");

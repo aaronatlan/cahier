@@ -16,25 +16,36 @@ Chaque cours est un dossier `~/Cours/<id>/` (hors de ce repo) contenant :
   page par page + image de chaque page, à lire avec l'outil Read pour les schémas/formules)
 - `meta.json` — titre, date, durée, `matiere` (code du module, voir `app/subjects.py`)
 - `resume.md` — résumé lisible de la transcription (voir section "Résumé" ci-dessous)
-- `fiche.tex` / `fiche.pdf`, `exercices.tex` / `exercices.pdf` — générés par la commande `/fiche`
+- `fiche.tex` / `fiche.pdf` (commande `/fiche`), `exercices.tex` / `exercices.pdf` (commande
+  `/exercices`)
+- `audio.partial.pcm` — sauvegarde continue de l'audio *pendant* l'enregistrement (PCM 16 bits
+  brut, supprimée dès que `audio.wav` est écrit à l'arrêt) ; `.transcribed_until` — jusqu'où
+  l'audio est déjà transcrit. Ces deux fichiers n'existent que si l'app a été tuée avant la
+  fin de l'arrêt : `app/recovery.py` les exploite au démarrage suivant pour reconstruire
+  `audio.wav`, transcrire la fin et clore le cours (statut `done`).
 
 ## Génération à la demande (résumé, fiche, exercices)
 
-La commande `/fiche <id-du-cours>` (voir `.claude/commands/fiche.md`) génère les trois :
-`resume.md`, `fiche.tex` et `exercices.tex`. Deux façons de la lancer :
+Trois commandes indépendantes, une par livrable (`.claude/commands/`) :
+`/resume <id>` → `resume.md`, `/fiche <id>` → `fiche.tex`/`fiche.pdf`,
+`/exercices <id>` → `exercices.tex`/`exercices.pdf`. Chacune lit elle-même ce dont elle a
+besoin (méta, transcription, slides) ; `/fiche` et `/exercices` exploitent `resume.md` /
+`fiche.tex` s'ils existent déjà mais n'en dépendent pas. Deux façons de les lancer :
 
-- **Depuis l'app** : le bouton "Générer avec Claude Code" (onglets Résumé/Fiche/Exercices
-  quand ils sont vides) appelle `POST /api/courses/{id}/generate`, qui lance directement
-  `claude -p "/fiche <id>"` en sous-processus (chemin absolu vers le binaire, `--permission-mode
-  acceptEdits` + `--allowedTools` scopé à Read/Write/Edit/Bash/Grep/Glob/WebSearch/WebFetch/Agent
-  — pas `--dangerously-skip-permissions`, qui bypasserait tout le système de permissions).
-  Un fichier verrou `.generating` dans le dossier du cours empêche un double lancement (y
-  compris après un redémarrage de l'app) et expire après 30 min s'il est resté orphelin ;
-  la sortie du process est journalisée dans `generation.log`. L'app poll `GET
-  /api/courses/{id}/generate/status` pour savoir quand rafraîchir l'affichage.
-- **Depuis une session Claude Code ouverte dans ce dossier** (`.claude/commands/fiche.md`
-  n'est reconnu que si la session est rootée ici, pas à la racine du workspace parent) :
-  taper directement `/fiche <id>`.
+- **Depuis l'app** : le bouton "Générer avec Claude Code" de chaque onglet (Résumé/Fiche/
+  Exercices, quand vide) déclenche **uniquement** son livrable via
+  `POST /api/courses/{id}/generate/{resume|fiche|exercices}`, qui lance `claude -p
+  "/<kind> <id>"` en sous-processus (chemin absolu vers le binaire, `--permission-mode
+  acceptEdits` + `--allowedTools` scopé à Read/Write/Edit/Bash/Grep/Glob/WebSearch/WebFetch/
+  Agent — pas `--dangerously-skip-permissions`, qui bypasserait tout le système de
+  permissions). Un verrou `.generating-<kind>` dans le dossier du cours empêche un double
+  lancement du même livrable (y compris après un redémarrage de l'app ; expire après 30 min
+  s'il reste orphelin) mais autorise deux livrables différents en parallèle ; la sortie est
+  journalisée dans `generation-<kind>.log`. L'app poll `GET
+  /api/courses/{id}/generate/{kind}/status` pour savoir quand rafraîchir l'affichage.
+- **Depuis une session Claude Code ouverte dans ce dossier** (les commandes projet ne sont
+  reconnues que si la session est rootée ici, pas à la racine du workspace parent) : taper
+  directement `/resume <id>`, `/fiche <id>` ou `/exercices <id>`.
 
 ## Résumé (`resume.md`)
 
@@ -66,8 +77,8 @@ ces éléments) :
 
 ## Génération de `fiche.tex` et `exercices.tex` : délégation aux agents
 
-`fiche.tex` et `exercices.tex` ne sont **pas** écrits directement par la session `/fiche` :
-elle délègue à deux agents définis au niveau du workspace parent (`~/jarvis-starter-kit/.claude/agents/`),
+`fiche.tex` et `exercices.tex` ne sont **pas** écrits directement par la session `/fiche`/`/exercices` :
+elles délèguent à deux agents définis au niveau du workspace parent (`~/jarvis-starter-kit/.claude/agents/`),
 déjà réglés sur les standards de qualité et de mise en forme voulus par Aaron pour ses fiches MIT :
 
 - **`fiche-cours`** pour `fiche.tex` — encadrés `tcolorbox` colorés par type de contenu
@@ -78,9 +89,9 @@ déjà réglés sur les standards de qualité et de mise en forme voulus par Aar
 
 Ces agents utilisent leur **propre préambule LaTeX autonome** (embarqué dans chaque `.tex`,
 pas de fichier partagé à copier) et leur propre destination par défaut
-(`livrables/mit/fiche-<nom>/...`) : `/fiche` leur redirige explicitement la sortie vers
+(`livrables/mit/fiche-<nom>/...`) : `/fiche` et `/exercices` leur redirigent explicitement la sortie vers
 `~/Cours/<id>/fiche.tex` et `~/Cours/<id>/exercices.tex` dans le prompt de délégation (voir
-`.claude/commands/fiche.md`). Ne pas dupliquer leurs instructions de style ici — elles vivent
+`.claude/commands/fiche.md` et `exercices.md`). Ne pas dupliquer leurs instructions de style ici — elles vivent
 dans les fichiers d'agent, source de vérité unique pour éviter toute dérive entre les deux.
 
 ### Priorité des sources : slides d'abord
@@ -89,5 +100,5 @@ Fiche et exercices doivent principalement s'appuyer sur **les slides** quand ell
 (structure, définitions, formules telles que présentées par l'enseignant) — c'est la source
 la plus fiable et la mieux organisée. Le résumé/transcript sert de source **secondaire** :
 contexte donné à l'oral, exemples, digressions utiles, questions/réponses. Sans slides,
-structurer directement sur le résumé/transcript. `/fiche` transmet cette priorité aux agents
+structurer directement sur le résumé/transcript. `/fiche` et `/exercices` transmettent cette priorité aux agents
 dans son prompt de délégation (les agents n'ont pas cette notion de "slides Cahier" par défaut).

@@ -14,11 +14,12 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from . import recovery
 from . import slides as slides_module
 from . import storage
 from . import subjects as subjects_module
 from .live_transcription import live_transcriber
-from .recorder import recorder
+from .recorder import PARTIAL_FILENAME, recorder
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -38,7 +39,9 @@ app.mount("/static", NoCacheStaticFiles(directory=STATIC_DIR), name="static")
 
 _current_course_id: Optional[str] = None
 
-# --- Génération résumé/fiche/exercices via /fiche (Claude Code CLI) --------
+# --- Génération résumé/fiche/exercices via /resume, /fiche, /exercices -----
+# (Claude Code CLI) — un slash command dédié par livrable, pour que chaque
+# bouton de l'app puisse déclencher uniquement celui-là.
 
 CAHIER_ROOT = Path(__file__).resolve().parent.parent
 # Chemin absolu : les apps GUI lancées depuis le Finder n'héritent pas du PATH
@@ -46,16 +49,17 @@ CAHIER_ROOT = Path(__file__).resolve().parent.parent
 # raison que le chemin absolu déjà utilisé pour pdflatex (voir CLAUDE.md).
 CLAUDE_BIN = str(Path.home() / ".local" / "bin" / "claude")
 GENERATION_STALE_SEC = 30 * 60  # au-delà, on considère le verrou abandonné
+GENERATION_KINDS = ("resume", "fiche", "exercices")
 
-_generation_procs: dict[str, subprocess.Popen] = {}
-
-
-def _generation_lock_path(course_dir: Path) -> Path:
-    return course_dir / ".generating"
+_generation_procs: dict[tuple[str, str], subprocess.Popen] = {}
 
 
-def _generation_running(course_dir: Path) -> bool:
-    lock_path = _generation_lock_path(course_dir)
+def _generation_lock_path(course_dir: Path, kind: str) -> Path:
+    return course_dir / f".generating-{kind}"
+
+
+def _generation_running(course_dir: Path, kind: str) -> bool:
+    lock_path = _generation_lock_path(course_dir, kind)
     if not lock_path.exists():
         return False
     age = time.time() - lock_path.stat().st_mtime
@@ -65,6 +69,9 @@ def _generation_running(course_dir: Path) -> bool:
 @app.on_event("startup")
 def _on_startup() -> None:
     storage.migrate_legacy()
+    # Clôt les enregistrements interrompus (app tuée avant la fin de l'arrêt) sans
+    # bloquer le démarrage : la transcription de leur fin peut prendre du temps.
+    threading.Thread(target=recovery.recover_orphans, daemon=True).start()
 
 
 @app.get("/")
@@ -98,11 +105,14 @@ def start_recording(body: StartRecordingBody = StartRecordingBody()) -> dict:
     global _current_course_id
     if recorder.is_recording:
         raise HTTPException(status_code=400, detail="Un enregistrement est déjà en cours.")
-    try:
-        recorder.start()
-    except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
     course_id, course_dir = storage.create_course(matiere=body.matiere)
+    try:
+        # Sauvegarde continue sur disque : si l'app est tuée avant l'arrêt, l'audio
+        # reste récupérable au redémarrage (voir recovery.py).
+        recorder.start(persist_path=course_dir / PARTIAL_FILENAME)
+    except Exception as exc:  # noqa: BLE001
+        storage.delete_course(course_id)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
     _current_course_id = course_id
     live_transcriber.start(course_dir / "transcription.txt")
     return {"id": course_id}
@@ -119,13 +129,14 @@ def stop_recording(background_tasks: BackgroundTasks) -> dict:
     course_dir = storage.get_course_dir(course_id)
     audio_path = course_dir / "audio.wav"
 
-    # pause() capture ce qui n'a pas encore été transcrit AVANT recorder.stop(),
-    # qui vide le buffer du recorder — le gros du cours a déjà été transcrit au
-    # fil de l'enregistrement, il ne reste que cette dernière tranche à traiter.
-    tail_audio = live_transcriber.pause()
+    # Le micro doit se couper tout de suite : on se contente de signaler l'arrêt à
+    # la transcription en flux (sans attendre la tranche en cours, qui peut durer
+    # plusieurs minutes). recorder.stop() rend la dernière tranche non transcrite ;
+    # l'attente de la transcription se fait en tâche de fond (_finalize_transcription).
+    live_transcriber.signal_stop()
 
     try:
-        duration = recorder.stop(audio_path)
+        duration, tail_audio = recorder.stop(audio_path)
     except Exception as exc:  # noqa: BLE001
         storage.update_course(course_id, statut="error", erreur=str(exc))
         raise HTTPException(status_code=500, detail=str(exc)) from exc
@@ -244,23 +255,29 @@ def delete_slide_page(course_id: str, page_number: int) -> dict:
     return {"pages": remaining}
 
 
-@app.post("/api/courses/{course_id}/generate")
-def start_generation(course_id: str) -> dict:
+def _check_generation_kind(kind: str) -> None:
+    if kind not in GENERATION_KINDS:
+        raise HTTPException(status_code=400, detail="Type de génération inconnu.")
+
+
+@app.post("/api/courses/{course_id}/generate/{kind}")
+def start_generation(course_id: str, kind: str) -> dict:
+    _check_generation_kind(kind)
     meta = storage.get_course(course_id)
     if meta is None:
         raise HTTPException(status_code=404, detail="Cours introuvable.")
     course_dir = storage.get_course_dir(course_id)
-    if _generation_running(course_dir):
-        raise HTTPException(status_code=409, detail="Génération déjà en cours pour ce cours.")
+    if _generation_running(course_dir, kind):
+        raise HTTPException(status_code=409, detail="Génération déjà en cours pour ce livrable.")
 
-    lock_path = _generation_lock_path(course_dir)
+    lock_path = _generation_lock_path(course_dir, kind)
     lock_path.write_text("", encoding="utf-8")
-    log_file = (course_dir / "generation.log").open("w", encoding="utf-8")
+    log_file = (course_dir / f"generation-{kind}.log").open("w", encoding="utf-8")
     proc = subprocess.Popen(
         [
             CLAUDE_BIN,
             "-p",
-            f"/fiche {course_id}",
+            f"/{kind} {course_id}",
             "--permission-mode",
             "acceptEdits",
             "--allowedTools",
@@ -270,7 +287,7 @@ def start_generation(course_id: str) -> dict:
         stdout=log_file,
         stderr=subprocess.STDOUT,
     )
-    _generation_procs[course_id] = proc
+    _generation_procs[(course_id, kind)] = proc
 
     def _watch() -> None:
         proc.wait()
@@ -281,12 +298,13 @@ def start_generation(course_id: str) -> dict:
     return {"ok": True}
 
 
-@app.get("/api/courses/{course_id}/generate/status")
-def generation_status(course_id: str) -> dict:
+@app.get("/api/courses/{course_id}/generate/{kind}/status")
+def generation_status(course_id: str, kind: str) -> dict:
+    _check_generation_kind(kind)
     course_dir = storage.get_course_dir(course_id)
-    if _generation_running(course_dir):
+    if _generation_running(course_dir, kind):
         return {"state": "running"}
-    proc = _generation_procs.get(course_id)
+    proc = _generation_procs.get((course_id, kind))
     if proc is None:
         return {"state": "idle"}
     return {"state": "done" if proc.returncode == 0 else "error", "exit_code": proc.returncode}

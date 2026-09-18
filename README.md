@@ -23,9 +23,9 @@ Ouvre **Cahier** depuis le Dock ou Spotlight. Aucun terminal à ouvrir.
 3. Ajoute les slides du cours (PDF) dans l'onglet **Slides** si tu en as.
 4. Onglets **Résumé** / **Fiche** / **Exercices** : bouton "Générer avec
    Claude Code" → lance directement le CLI `claude` en fond (pas de
-   copier-coller, pas de terminal) ; résumé, fiche et exercices sont générés
-   et la fiche/les exercices compilés en PDF, consultables directement dans
-   l'app une fois prêts.
+   copier-coller, pas de terminal), uniquement pour le livrable de l'onglet
+   (les trois sont indépendants) ; fiche et exercices sont compilés en PDF,
+   consultables directement dans l'app une fois prêts.
 
 Tous les cours sont stockés dans `~/Cours/<id>/` (audio, transcription,
 slides, fiche/exercices).
@@ -75,7 +75,8 @@ et signer (`com.aaronatlan.cahier`), ce qui résout le problème.
   (fixé à `"en"`, les cours étant toujours en anglais).
 - `app/subjects.py` : liste des modules MIT pour le regroupement de la
   bibliothèque.
-- `.claude/commands/fiche.md` : la commande `/fiche <id>` qui génère la fiche
+- `.claude/commands/{resume,fiche,exercices}.md` : les commandes `/resume <id>`,
+  `/fiche <id>` et `/exercices <id>` (une par livrable) qui génèrent le résumé, la fiche
   et les exercices. Voir `CLAUDE.md` pour les conventions LaTeX.
 
 ## Ancien script (`cours.py`)
