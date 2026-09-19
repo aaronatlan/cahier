@@ -7,6 +7,7 @@
     courses: [],
     search: "",
     selectedSubjectCode: "",
+    selectedLangue: "en",
     currentId: null,
     activeTab: "transcription",
     recState: "idle", // idle | recording | transcribing
@@ -291,6 +292,12 @@
     $("#record-timer").textContent = "00:00";
     $("#record-status").textContent = "Prêt";
     $("#subject-select").disabled = false;
+    $("#langue-select").disabled = false;
+  }
+
+  function setLangue(code) {
+    state.selectedLangue = code;
+    $("#langue-select").value = code;
   }
 
   function tick() {
@@ -305,6 +312,7 @@
     $("#record-icon").className = "record-icon is-recording";
     $("#record-status").textContent = "Enregistrement…";
     $("#subject-select").disabled = true;
+    $("#langue-select").disabled = true;
     tick();
     clearInterval(state.timerInterval);
     state.timerInterval = setInterval(tick, 500);
@@ -315,7 +323,7 @@
       await api("/api/record/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ matiere: state.selectedSubjectCode }),
+        body: JSON.stringify({ matiere: state.selectedSubjectCode, langue: state.selectedLangue }),
       });
     } catch (err) {
       $("#record-status").textContent = err.message;
@@ -353,6 +361,7 @@
           $("#record-status").textContent = "Erreur : " + (course.erreur || "inconnue");
           $("#record-btn").className = "record-btn";
           $("#subject-select").disabled = false;
+          $("#langue-select").disabled = false;
         } else {
           goLibrary();
         }
@@ -377,6 +386,7 @@
     $("#detail-subject-title").textContent = course.matiere_titre;
     renderDetailTitre(course.titre);
     $("#detail-date").textContent = formatDate(course.date);
+    $("#retranscribe-langue").value = course.langue || "en";
     $("#transcription-text").textContent = course.transcription ||
       (course.statut === "transcribing" ? "Transcription en cours…" : "(vide)");
 
@@ -587,6 +597,37 @@
     }
   }
 
+  async function retranscribeCurrentCourse() {
+    const id = state.currentId;
+    if (!id) return;
+    const langue = $("#retranscribe-langue").value;
+    if (!confirm("Refaire la transcription depuis l'audio ? L'ancienne version est gardée dans transcription.prev.txt.")) return;
+    try {
+      await api(`/api/courses/${id}/retranscribe`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ langue }),
+      });
+    } catch (err) {
+      alert(err.message);
+      return;
+    }
+    $("#transcription-text").textContent = "Transcription en cours…";
+    $("#retranscribe-btn").disabled = true;
+    const timer = setInterval(async () => {
+      const course = await api(`/api/courses/${id}`).catch(() => null);
+      if (!course || course.statut === "transcribing") return;
+      clearInterval(timer);
+      $("#retranscribe-btn").disabled = false;
+      if (state.currentId !== id) return;
+      if (course.statut === "error") {
+        $("#transcription-text").textContent = "Erreur : " + (course.erreur || "inconnue");
+      } else {
+        selectCourse(id);
+      }
+    }, 2000);
+  }
+
   function switchTab(name) {
     state.activeTab = name;
     $$(".tab").forEach((t) => t.classList.toggle("active", t.dataset.tab === name));
@@ -691,7 +732,15 @@
 
     $("#subject-select").addEventListener("change", (e) => {
       state.selectedSubjectCode = e.target.value;
+      // "Autres" n'est pas forcément en anglais : détection automatique par défaut.
+      setLangue(e.target.value === "autres" ? "auto" : "en");
     });
+
+    $("#langue-select").addEventListener("change", (e) => {
+      state.selectedLangue = e.target.value;
+    });
+
+    $("#retranscribe-btn").addEventListener("click", retranscribeCurrentCourse);
 
     $("#record-btn").addEventListener("click", () => {
       if (state.recState === "idle") startRecording();

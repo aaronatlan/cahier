@@ -32,7 +32,7 @@ def new_course_id() -> str:
     return datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
 
-def create_course(matiere: str = "") -> tuple[str, Path]:
+def create_course(matiere: str = "", langue: str = "en") -> tuple[str, Path]:
     base_id = new_course_id()
     course_id = base_id
     course_dir = _course_dir(course_id)
@@ -46,6 +46,7 @@ def create_course(matiere: str = "") -> tuple[str, Path]:
         "id": course_id,
         "titre": "Nouveau cours",
         "matiere": matiere,
+        "langue": langue,
         "date": datetime.datetime.now().isoformat(timespec="seconds"),
         "duree_sec": 0,
         "statut": "recording",
@@ -72,6 +73,7 @@ def _enrich(meta: dict, course_dir: Path) -> dict:
     """Ajoute les champs calculés à partir de l'état du système de fichiers."""
     meta = dict(meta)
     meta.setdefault("matiere", "")
+    meta.setdefault("langue", "en")
     meta["matiere_titre"] = subjects_module.subject_title(meta["matiere"])
     meta["a_des_slides"] = (course_dir / "slides" / "source.pdf").exists()
     meta["resume_ok"] = (course_dir / "resume.md").exists()

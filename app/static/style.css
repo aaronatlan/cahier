@@ -394,7 +394,16 @@ button, input, select {
   width: 260px;
 }
 
-.detail-actions { margin-left: auto; }
+.detail-actions { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+
+.langue-mini {
+  font-size: 12px;
+  padding: 3px 6px;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  color: var(--c-text);
+  border-radius: var(--r-btn);
+}
 
 .tabs {
   display: flex;

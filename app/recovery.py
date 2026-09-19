@@ -78,7 +78,10 @@ def _recover(course_id: str) -> None:
             covered, min_tail = _last_timestamp_sec(text), MIN_TAIL_WITHOUT_MARKER_SEC
         if duration - covered > min_tail:
             audio, _ = sf.read(str(audio_path), start=int(covered * SAMPLE_RATE), dtype="float32")
-            tail_text = transcriber.transcribe_array(audio, offset_sec=covered)
+            langue = (storage.get_course(course_id) or {}).get("langue")
+            tail_text, _ = transcriber.transcribe_array(
+                audio, offset_sec=covered, language=transcriber.resolve_language(langue)
+            )
             if tail_text:
                 separator = "\n" if text and not text.endswith("\n") else ""
                 with transcript_path.open("a", encoding="utf-8") as f:

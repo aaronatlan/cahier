@@ -1,7 +1,7 @@
 # cahier
 
 Ce dossier contient l'app **Cahier** d'Aaron : enregistrement micro, transcription locale
-(faster-whisper, anglais), et bibliothèque de cours groupée par matière MIT. Les fiches de
+(faster-whisper, langue choisie par cours : anglais par défaut, français ou détection auto), et bibliothèque de cours groupée par matière MIT. Les fiches de
 révision et exercices ne sont **pas** générées par une clé API embarquée dans l'app — le
 bouton "Générer avec Claude Code" lance le CLI `claude` déjà authentifié sur la machine
 d'Aaron (voir section "Génération à la demande" ci-dessous), à la demande, jamais en fond
@@ -11,7 +11,7 @@ sans action explicite de l'utilisateur.
 
 Chaque cours est un dossier `~/Cours/<id>/` (hors de ce repo) contenant :
 - `audio.wav` — enregistrement brut
-- `transcription.txt` — transcription horodatée, en anglais, brute (whisper, peu ponctuée)
+- `transcription.txt` — transcription horodatée, brute (whisper, peu ponctuée), dans la langue du cours (`langue` dans `meta.json` : `en` par défaut, `fr`, ou `auto` puis remplacé par la langue détectée) ; `transcription.prev.txt` = version précédente après une retranscription
 - `slides/texte.txt` + `slides/page-XX.png` — si des slides ont été ajoutées (texte extrait
   page par page + image de chaque page, à lire avec l'outil Read pour les schémas/formules)
 - `meta.json` — titre, date, durée, `matiere` (code du module, voir `app/subjects.py`)
@@ -71,7 +71,7 @@ ces éléments) :
 - `**gras**` sur les termes clés, notions importantes, noms propres.
 - Si une question/réponse notable a eu lieu à l'oral, l'intégrer comme une puce (ex.
   `- **Q:** ... — **A:** ...`) plutôt que de la noter mot à mot.
-- Toujours en anglais (comme la transcription source), sauf demande contraire.
+- Dans la langue de la transcription source (champ `langue` de `meta.json`), sauf demande contraire.
 - Ne pas essayer de tout dire : c'est un résumé pour réviser vite, pas une retranscription
   reformulée phrase par phrase.
 

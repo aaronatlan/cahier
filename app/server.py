@@ -16,7 +16,7 @@ from pydantic import BaseModel
 
 from . import recovery
 from . import slides as slides_module
-from . import storage
+from . import storage, transcriber
 from . import subjects as subjects_module
 from .live_transcription import live_transcriber
 from .recorder import PARTIAL_FILENAME, recorder
@@ -98,6 +98,7 @@ def record_status() -> dict:
 
 class StartRecordingBody(BaseModel):
     matiere: str = ""
+    langue: str = "en"  # "en" | "fr" | "auto"
 
 
 @app.post("/api/record/start")
@@ -105,7 +106,9 @@ def start_recording(body: StartRecordingBody = StartRecordingBody()) -> dict:
     global _current_course_id
     if recorder.is_recording:
         raise HTTPException(status_code=400, detail="Un enregistrement est déjà en cours.")
-    course_id, course_dir = storage.create_course(matiere=body.matiere)
+    if body.langue not in transcriber.LANGUAGES:
+        raise HTTPException(status_code=400, detail="Langue non supportée.")
+    course_id, course_dir = storage.create_course(matiere=body.matiere, langue=body.langue)
     try:
         # Sauvegarde continue sur disque : si l'app est tuée avant l'arrêt, l'audio
         # reste récupérable au redémarrage (voir recovery.py).
@@ -114,7 +117,9 @@ def start_recording(body: StartRecordingBody = StartRecordingBody()) -> dict:
         storage.delete_course(course_id)
         raise HTTPException(status_code=500, detail=str(exc)) from exc
     _current_course_id = course_id
-    live_transcriber.start(course_dir / "transcription.txt")
+    live_transcriber.start(
+        course_dir / "transcription.txt", language=transcriber.resolve_language(body.langue)
+    )
     return {"id": course_id}
 
 
@@ -150,7 +155,11 @@ def _finalize_transcription(course_id: str, tail_audio) -> None:
     try:
         text = live_transcriber.finalize(tail_audio)
         title = storage.derive_title(text)
-        storage.update_course(course_id, statut="done", titre=title, erreur=None)
+        fields: dict = {"statut": "done", "titre": title, "erreur": None}
+        # En détection automatique, on mémorise la langue trouvée (utile pour retranscrire).
+        if (storage.get_course(course_id) or {}).get("langue") == "auto" and live_transcriber.language:
+            fields["langue"] = live_transcriber.language
+        storage.update_course(course_id, **fields)
     except Exception as exc:  # noqa: BLE001
         storage.update_course(course_id, statut="error", erreur=str(exc))
 
@@ -199,6 +208,53 @@ def rename_course(course_id: str, body: RenameBody) -> dict:
     if meta is None:
         raise HTTPException(status_code=404, detail="Cours introuvable.")
     return meta
+
+
+class RetranscribeBody(BaseModel):
+    langue: str  # "en" | "fr" | "auto"
+
+
+@app.post("/api/courses/{course_id}/retranscribe")
+def retranscribe(course_id: str, body: RetranscribeBody, background_tasks: BackgroundTasks) -> dict:
+    """Refait la transcription complète depuis audio.wav dans la langue donnée (cas d'un
+    cours transcrit dans la mauvaise langue). L'ancienne transcription est gardée dans
+    transcription.prev.txt."""
+    if body.langue not in transcriber.LANGUAGES:
+        raise HTTPException(status_code=400, detail="Langue non supportée.")
+    meta = storage.get_course(course_id)
+    if meta is None:
+        raise HTTPException(status_code=404, detail="Cours introuvable.")
+    if course_id == _current_course_id or meta.get("statut") in ("recording", "transcribing"):
+        raise HTTPException(status_code=409, detail="Ce cours est en cours d'enregistrement ou de transcription.")
+    if not (storage.get_course_dir(course_id) / "audio.wav").exists():
+        raise HTTPException(status_code=404, detail="Pas d'audio pour ce cours.")
+    storage.update_course(course_id, statut="transcribing", langue=body.langue, erreur=None)
+    background_tasks.add_task(_retranscribe, course_id, body.langue)
+    return {"id": course_id}
+
+
+def _retranscribe(course_id: str, langue: str) -> None:
+    course_dir = storage.get_course_dir(course_id)
+    transcript_path = course_dir / "transcription.txt"
+    try:
+        old_text = _read_text_or_empty(transcript_path)
+        text, detected = transcriber.transcribe(
+            course_dir / "audio.wav",
+            course_dir / "transcription.new.txt",
+            language=transcriber.resolve_language(langue),
+        )
+        if old_text:
+            (course_dir / "transcription.prev.txt").write_text(old_text, encoding="utf-8")
+        (course_dir / "transcription.new.txt").replace(transcript_path)
+        fields: dict = {"statut": "done", "erreur": None, "langue": detected if langue == "auto" else langue}
+        # Le titre auto-généré vient de l'ancien texte : on le régénère, sauf s'il a été renommé.
+        meta = storage.get_course(course_id) or {}
+        if meta.get("titre") == storage.derive_title(old_text) and text.strip():
+            fields["titre"] = storage.derive_title(text)
+        storage.update_course(course_id, **fields)
+    except Exception as exc:  # noqa: BLE001
+        (course_dir / "transcription.new.txt").unlink(missing_ok=True)
+        storage.update_course(course_id, statut="error", erreur=str(exc))
 
 
 @app.delete("/api/courses/{course_id}")

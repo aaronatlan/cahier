@@ -54,7 +54,7 @@ def record_audio(output_path: Path) -> None:
 
 def transcribe_audio(audio_path: Path, transcript_path: Path) -> None:
     print("Transcription en cours (ça peut prendre quelques minutes)...")
-    text = transcribe(audio_path, transcript_path)
+    text, _langue = transcribe(audio_path, transcript_path)
     print(text)
     print(f"\nTranscription sauvegardée : {transcript_path}")
 

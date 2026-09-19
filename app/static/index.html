@@ -48,6 +48,14 @@
         <label for="subject-select">Module</label>
         <select id="subject-select" class="subject-select"></select>
       </div>
+      <div class="field-group">
+        <label for="langue-select">Langue parlée</label>
+        <select id="langue-select" class="subject-select">
+          <option value="en">English</option>
+          <option value="fr">Français</option>
+          <option value="auto">Détection automatique</option>
+        </select>
+      </div>
       <button id="record-btn" class="record-btn" aria-label="Démarrer l'enregistrement">
         <span id="record-icon" class="record-icon"></span>
       </button>
@@ -67,6 +75,12 @@
           · <span id="detail-date"></span>
         </span>
         <span class="detail-actions">
+          <select id="retranscribe-langue" class="langue-mini" title="Langue de la transcription">
+            <option value="en">English</option>
+            <option value="fr">Français</option>
+            <option value="auto">Auto</option>
+          </select>
+          <button id="retranscribe-btn" class="btn-ghost-muted" title="Refaire la transcription depuis l'audio dans cette langue">Retranscrire</button>
           <button id="delete-course-btn" class="btn-ghost-muted">Supprimer</button>
         </span>
       </div>

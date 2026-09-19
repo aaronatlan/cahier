@@ -1,6 +1,6 @@
 # Cahier — enregistrement, transcription, fiche + exercices
 
-App macOS pour enregistrer et transcrire les cours (anglais, local, gratuit,
+App macOS pour enregistrer et transcrire les cours (local, gratuit,
 faster-whisper) sans ouvrir de terminal, avec une bibliothèque de tous les
 cours passés groupée par matière MIT. Les fiches de révision et exercices en
 LaTeX sont générés à la demande par Claude Code (pas de clé API embarquée
@@ -18,8 +18,10 @@ pour un changement sur Cahier. L'app installée tourne depuis
 Ouvre **Cahier** depuis le Dock ou Spotlight. Aucun terminal à ouvrir.
 
 1. Clique le bouton rond pour démarrer/arrêter l'enregistrement (choisis le
-   module concerné avant de lancer).
-2. La transcription se lance automatiquement (anglais, pas de traduction).
+   module et la langue parlée avant de lancer : English par défaut, Français, ou détection
+   automatique, préréglée sur "Auto" pour le module Autres).
+2. La transcription se lance automatiquement pendant l'enregistrement (pas de traduction).
+   Mauvaise langue ? Dans le détail du cours, choisis la langue puis **Retranscrire**.
 3. Ajoute les slides du cours (PDF) dans l'onglet **Slides** si tu en as.
 4. Onglets **Résumé** / **Fiche** / **Exercices** : bouton "Générer avec
    Claude Code" → lance directement le CLI `claude` en fond (pas de
@@ -71,8 +73,8 @@ et signer (`com.aaronatlan.cahier`), ce qui résout le problème.
 
 ## Réglages utiles
 
-- `app/transcriber.py` : `MODEL_SIZE` (`"medium"` par défaut) et `LANGUAGE`
-  (fixé à `"en"`, les cours étant toujours en anglais).
+- `app/transcriber.py` : `MODEL_SIZE` (`"medium"` par défaut) et `DEFAULT_LANGUAGE`
+  (`"en"` ; la langue réelle est choisie par cours, `meta.json` → `langue`).
 - `app/subjects.py` : liste des modules MIT pour le regroupement de la
   bibliothèque.
 - `.claude/commands/{resume,fiche,exercices}.md` : les commandes `/resume <id>`,

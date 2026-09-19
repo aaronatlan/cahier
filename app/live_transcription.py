@@ -25,9 +25,15 @@ class LiveTranscriber:
         self._transcript_path: Path | None = None
         self._offset_sec = 0.0
         self._chunks: list[str] = []
+        self._language: str | None = transcriber.DEFAULT_LANGUAGE
+        self.language: str | None = transcriber.DEFAULT_LANGUAGE  # langue utilisée/détectée
         self._process_lock = threading.Lock()
 
-    def start(self, transcript_path: Path) -> None:
+    def start(self, transcript_path: Path, language: str | None = transcriber.DEFAULT_LANGUAGE) -> None:
+        """language=None : détection automatique sur la première tranche parlée, puis
+        verrouillée pour le reste de l'enregistrement (évite qu'elle oscille)."""
+        self._language = language
+        self.language = language
         self._transcript_path = transcript_path
         self._offset_sec = 0.0
         self._chunks = []
@@ -58,7 +64,11 @@ class LiveTranscriber:
         duration = len(audio) / SAMPLE_RATE
         with self._process_lock:
             try:
-                text = transcriber.transcribe_array(audio, offset_sec=self._offset_sec)
+                text, detected = transcriber.transcribe_array(
+                    audio, offset_sec=self._offset_sec, language=self._language
+                )
+                if self._language is None and text:
+                    self._language = self.language = detected
             except Exception as exc:  # noqa: BLE001
                 # Une tranche ratée ne doit pas faire perdre le reste du cours : on
                 # avance quand même l'offset et on continue sur la suivante.
